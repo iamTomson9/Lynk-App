@@ -47,10 +47,7 @@ export const LoginStyles = StyleSheet.create({
     position: 'absolute',
     borderWidth: 3,
     borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.1)',
     elevation: 5, // For Android shadow
   },
   avatarTopLeft: {
@@ -89,8 +86,8 @@ export const LoginStyles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  // Button
-  loginButton: {
+  // Buttons
+  primaryButton: {
     width: '100%',
     height: 56,
     backgroundColor: '#FF4D6D', // Lynk primary pink
@@ -98,18 +95,33 @@ export const LoginStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#FF4D6D',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    marginBottom: 15,
+    boxShadow: '0px 4px 10px rgba(255, 77, 109, 0.3)',
     elevation: 5,
   },
-  loginButtonText: {
+  primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 10, // Space between icon and text
+    marginLeft: 10,
+  },
+  secondaryButton: {
+    width: '100%',
+    height: 56,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 28,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FF4D6D',
+  },
+  secondaryButtonText: {
+    color: '#FF4D6D',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
   },
 
   // Footer

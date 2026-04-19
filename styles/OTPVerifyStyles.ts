@@ -67,10 +67,7 @@ export const OTPVerifyStyles = StyleSheet.create({
     borderColor: '#E0E0E0',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    boxShadow: '0px 2px 5px rgba(0, 0, 0, 0.05)',
     elevation: 2,
   },
   digitBoxActive: {
@@ -114,15 +111,12 @@ export const OTPVerifyStyles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#FF4D6D',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    boxShadow: '0px 4px 10px rgba(255, 77, 109, 0.3)',
     elevation: 5,
   },
   verifyButtonDisabled: {
     backgroundColor: '#FFB3C1', // Lighter pink when disabled
-    shadowOpacity: 0.1,
+    boxShadow: '0px 4px 10px rgba(255, 77, 109, 0.1)',
   },
   verifyButtonText: {
     color: '#FFFFFF',

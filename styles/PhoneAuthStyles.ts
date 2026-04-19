@@ -50,10 +50,7 @@ export const PhoneAuthStyles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 30,
     // Add shadow to make it pop out like a physical card
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.05)',
     elevation: 3,
   },
   countryCodeBox: {
@@ -88,10 +85,7 @@ export const PhoneAuthStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 30,
-    shadowColor: '#FF4D6D',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    boxShadow: '0px 4px 10px rgba(255, 77, 109, 0.3)',
     elevation: 5,
   },
   continueButtonText: {
@@ -131,10 +125,7 @@ export const PhoneAuthStyles = StyleSheet.create({
     marginBottom: 15,
     borderWidth: 1,
     borderColor: '#EEEEEE',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    boxShadow: '0px 2px 5px rgba(0, 0, 0, 0.05)',
     elevation: 2,
   },
   socialButtonText: {

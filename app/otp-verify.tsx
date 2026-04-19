@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, ActivityIndicator } from 'react-native';
 import { Heart } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { OTPVerifyStyles } from '../styles/OTPVerifyStyles';
@@ -7,50 +7,65 @@ import { OTPVerifyStyles } from '../styles/OTPVerifyStyles';
 export default function OTPVerifyScreen() {
   const router = useRouter();
   
-  // We use "useState" to remember the 6-digit code the user types
   const [code, setCode] = useState('');
-  const CODE_LENGTH = 6; // Firebase uses 6 digits
-  
-  // A "ref" gives us a way to directly control the invisible text input
+  const [isLoading, setIsLoading] = useState(false);
+  const CODE_LENGTH = 6; 
   const inputRef = useRef<TextInput>(null);
 
-  const handleVerify = () => {
-    // We will connect this to Firebase later to verify the code
+  const handleVerify = async () => {
     if (code.length === CODE_LENGTH) {
-      alert("Code verified! (Mock)");
-      // Next, they will go to Profile Setup. Let's redirect to a placeholder for now.
-      router.push('/profile-setup');
+      setIsLoading(true);
+
+      try {
+        // 1. Get the confirmation object we saved in the previous screen
+        const confirmationResult = window.confirmationResult;
+        
+        if (!confirmationResult) {
+          alert("Something went wrong. Please go back and request a new code.");
+          setIsLoading(false);
+          return;
+        }
+
+        // 2. Ask Firebase to verify the 6-digit code the user typed
+        const result = await confirmationResult.confirm(code);
+        
+        // 3. If successful, 'result.user' contains the logged-in user!
+        console.log("Successfully logged in:", result.user.uid);
+        setIsLoading(false);
+        
+        // Push them to the Profile Setup screen
+        router.push('/profile-setup');
+
+      } catch (error) {
+        console.error(error);
+        alert("Invalid verification code. Please try again.");
+        setIsLoading(false);
+        setCode(''); // Clear the input so they can type again
+      }
     }
   };
 
-  // This helper array lets us map over 6 items to draw 6 boxes easily
   const codeDigitsArray = new Array(CODE_LENGTH).fill(0);
 
   return (
-    // KeyboardAvoidingView prevents the keyboard from hiding our buttons
     <KeyboardAvoidingView 
       style={OTPVerifyStyles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* If the user taps anywhere outside the boxes, we dismiss the keyboard */}
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1, width: '100%', alignItems: 'center' }}>
           
-          {/* 1. Header Logo */}
           <View style={OTPVerifyStyles.headerLogoContainer}>
             <Heart weight="fill" size={20} color="#E82B73" style={OTPVerifyStyles.headerLeftHeart} />
             <Text style={OTPVerifyStyles.headerLogoText}>Lynk</Text>
             <Heart weight="fill" size={16} color="#E82B73" style={OTPVerifyStyles.headerRightHeart} />
           </View>
 
-          {/* 2. Main Title & Subtitle */}
           <Text style={OTPVerifyStyles.titleText}>Verification Code</Text>
           <Text style={OTPVerifyStyles.subtitleText}>
-            Please enter code we just sent to <Text style={OTPVerifyStyles.phoneNumberText}>+267 77 111 111</Text>
+            Please enter code we just sent to your phone.
           </Text>
 
-          {/* 3. The 6-Digit Code Input UI */}
-          {/* We hide the actual input and use it behind the scenes! */}
           <TextInput
             ref={inputRef}
             style={OTPVerifyStyles.hiddenInput}
@@ -58,19 +73,17 @@ export default function OTPVerifyScreen() {
             maxLength={CODE_LENGTH}
             value={code}
             onChangeText={setCode}
-            autoFocus={true} // Automatically open the keyboard when they arrive here
+            autoFocus={true} 
           />
           
-          {/* We draw 6 separate boxes. Tapping any box focuses the hidden input */}
           <TouchableOpacity 
             style={OTPVerifyStyles.codeContainer}
-            activeOpacity={0.8}
+            activeOpacity={1}
             onPress={() => inputRef.current?.focus()}
           >
             {codeDigitsArray.map((_, index) => {
               const emptyInputChar = ' ';
               const digit = code[index] || emptyInputChar;
-              // If the user has typed up to this box, we highlight it
               const isCurrentDigit = index === code.length;
               const isLastDigit = index === CODE_LENGTH - 1;
               const isCodeComplete = code.length === CODE_LENGTH;
@@ -90,25 +103,27 @@ export default function OTPVerifyScreen() {
             })}
           </TouchableOpacity>
 
-          {/* 4. Resend Code */}
           <View style={OTPVerifyStyles.resendContainer}>
             <Text style={OTPVerifyStyles.resendText}>Didn't receive OTP?</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.back()}>
               <Text style={OTPVerifyStyles.resendLink}>Resend Code</Text>
             </TouchableOpacity>
           </View>
 
-          {/* 5. Verify Button */}
           <TouchableOpacity 
             style={[
               OTPVerifyStyles.verifyButton, 
-              code.length < CODE_LENGTH ? OTPVerifyStyles.verifyButtonDisabled : {}
+              code.length < CODE_LENGTH || isLoading ? OTPVerifyStyles.verifyButtonDisabled : {}
             ]}
-            disabled={code.length < CODE_LENGTH}
+            disabled={code.length < CODE_LENGTH || isLoading}
             onPress={handleVerify}
             activeOpacity={0.8}
           >
-            <Text style={OTPVerifyStyles.verifyButtonText}>Verify</Text>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={OTPVerifyStyles.verifyButtonText}>Verify</Text>
+            )}
           </TouchableOpacity>
 
         </View>

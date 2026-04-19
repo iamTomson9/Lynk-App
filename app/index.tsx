@@ -4,6 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Heart } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebaseConfig';
+
 // We import our newly separated CSS/Styles here
 import { SplashStyles } from '../styles/SplashStyles';
 
@@ -11,14 +15,40 @@ export default function SplashScreen() {
   const router = useRouter();
 
   useEffect(() => {
-    // This timer simulates a loading process.
-    // After 3 seconds, we navigate to the login screen.
-    const timer = setTimeout(() => {
-      router.replace('/login');
-    }, 3000);
+    // Listen for Firebase authentication state changes
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Show splash for at least 2.5 seconds
+      await new Promise(resolve => setTimeout(resolve, 2500));
 
-    // Cleanup the timer if the component unmounts before 3 seconds
-    return () => clearTimeout(timer);
+      if (user) {
+        // Email unverified → send to verification screen
+        if (user.email && !user.emailVerified) {
+          router.replace('/verify-email');
+          return;
+        }
+
+        // Check if this user has already completed their profile in Firestore
+        try {
+          const profileDoc = await getDoc(doc(db, 'users', user.uid));
+          if (profileDoc.exists() && profileDoc.data()?.firstName) {
+            // Profile is complete → go to the main app
+            router.replace('/(tabs)/discover');
+          } else {
+            // Profile incomplete → go to setup wizard
+            router.replace('/profile-setup');
+          }
+        } catch (e) {
+          // Fallback: if Firestore is unreachable, send to profile-setup
+          router.replace('/profile-setup');
+        }
+      } else {
+        // Not logged in
+        router.replace('/login');
+      }
+    });
+
+    // Cleanup listener on unmount
+    return () => unsubscribe();
   }, []);
 
   return (

@@ -5,10 +5,15 @@ import { Stack } from "expo-router";
 // We are using a Stack navigator here, which means screens will stack on top of each other.
 export default function RootLayout() {
   return (
-    <Stack>
-      {/* We set headerShown to false because we want to build our own custom headers/screens */}
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
+    <Stack screenOptions={{ headerShown: false }}>
+      {/* Auth + Onboarding screens */}
+      <Stack.Screen name="index" />
+      <Stack.Screen name="login" />
+      <Stack.Screen name="email-auth" />
+      <Stack.Screen name="verify-email" />
+      <Stack.Screen name="profile-setup" />
+      {/* Main app — tab group */}
+      <Stack.Screen name="(tabs)" />
     </Stack>
   );
 }

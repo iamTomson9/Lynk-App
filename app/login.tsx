@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { Heart, Phone } from 'phosphor-react-native';
+import { Heart, Phone, Envelope } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { LoginStyles } from '../styles/LoginStyles';
 
@@ -41,15 +41,23 @@ export default function LoginScreen() {
         </Text>
       </View>
 
-      {/* 4. Login Button */}
-      {/* TouchableOpacity is like a button but gives a nice fade effect when pressed */}
+      {/* 4. Login Buttons */}
       <TouchableOpacity 
-        style={LoginStyles.loginButton}
-        onPress={() => router.push('/phone-auth')} // We will build this next!
+        style={LoginStyles.primaryButton}
+        onPress={() => router.push('/email-auth')}
         activeOpacity={0.8}
       >
-        <Phone weight="fill" size={24} color="#FFFFFF" />
-        <Text style={LoginStyles.loginButtonText}>Login with Phone</Text>
+        <Envelope weight="fill" size={24} color="#FFFFFF" />
+        <Text style={LoginStyles.primaryButtonText}>Continue with Email</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={LoginStyles.secondaryButton}
+        onPress={() => router.push('/phone-auth')}
+        activeOpacity={0.8}
+      >
+        <Phone weight="fill" size={24} color="#FF4D6D" />
+        <Text style={LoginStyles.secondaryButtonText}>Continue with Phone</Text>
       </TouchableOpacity>
 
       {/* 5. Footer */}
