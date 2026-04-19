@@ -192,6 +192,19 @@ export const DiscoverStyles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+  primaryBtn: {
+    backgroundColor: '#FF4D6D',
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0px 4px 12px rgba(255,77,109,0.3)',
+  },
+  primaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 
   // ─── Match Overlay ────────────────────────────────
   matchOverlay: {

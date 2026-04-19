@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Image, StyleSheet, ScrollView } from 'react-native';
 import { CaretLeft, Plus, X } from 'phosphor-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { ProfileSetupStyles } from '../styles/ProfileSetupStyles';
-import { uploadProfileImageAsync, saveUserProfileAsync } from '../utils/firebaseUtils';
+import { saveUserProfileAsync, validateImageSize } from '../utils/firebaseUtils';
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
   
   // Wizard State
   const [step, setStep] = useState(1);
-  const totalSteps = 4;
+  const totalSteps = 5;
   const [isLoading, setIsLoading] = useState(false);
 
   // Form State
@@ -20,13 +20,33 @@ export default function ProfileSetupScreen() {
   const [dob, setDob] = useState(''); 
   const [gender, setGender] = useState('');
   const [interestedIn, setInterestedIn] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+  // Each entry holds the local URI (for preview) and the base64 string (for upload)
+  const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
+  const [interests, setInterests] = useState<string[]>([]);
+
+  // Available interest chips
+  const INTERESTS = [
+    '🎵 Music', '🏋️ Fitness', '✈️ Travel', '📸 Photography',
+    '🎮 Gaming', '🍳 Cooking', '📚 Reading', '🎨 Art',
+    '⚽ Sports', '🎬 Movies', '🐾 Pets', '🌿 Nature',
+    '💃 Dancing', '🧘 Yoga', '🎸 Concerts', '🍕 Foodie',
+    '🏄 Surfing', '🧗 Hiking', '🎭 Theatre', '💻 Tech',
+  ];
+
+  const toggleInterest = (item: string) => {
+    if (interests.includes(item)) {
+      setInterests(interests.filter(i => i !== item));
+    } else if (interests.length < 5) {
+      setInterests([...interests, item]);
+    }
+  };
 
   // Validation
   const canProceedStep1 = firstName.trim().length > 0 && lastName.trim().length > 0;
   const canProceedStep2 = dob.length > 0;
   const canProceedStep3 = gender !== '' && interestedIn !== '';
-  const canProceedStep4 = photos.length > 0;
+  const canProceedStep4 = photos.length > 0 && photos.every(p => p.base64.length > 0);
+  const canProceedStep5 = interests.length >= 1;
 
   const handleNext = () => {
     if (step < totalSteps) {
@@ -46,12 +66,36 @@ export default function ProfileSetupScreen() {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 5], 
-      quality: 0.8,
+      aspect: [4, 5],
+      quality: 0.1,  // Dropped to 0.1 to ensure base64 stays under Firestore's 1MB limit
+      exif: false,
+      base64: true,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setPhotos([...photos, result.assets[0].uri]);
+      const asset = result.assets[0];
+
+      if (!asset.base64) {
+        alert('Could not read photo. Please try a different image.');
+        return;
+      }
+
+      // Log size for debugging
+      console.log(`[Picker] Selected image size: ~${Math.round(asset.base64.length / 1024)} KB (base64)`);
+
+      // Validate file size — reject anything over 5MB
+      const sizeError = validateImageSize(asset.fileSize);
+      if (sizeError) {
+        alert(sizeError);
+        return;
+      }
+
+      // Build data URL from the base64 string the picker gave us
+      const ext = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+      const dataUrl = `data:${mime};base64,${asset.base64}`;
+
+      setPhotos([...photos, { uri: asset.uri, base64: dataUrl }]);
     }
   };
 
@@ -63,30 +107,38 @@ export default function ProfileSetupScreen() {
 
   const submitProfile = async () => {
     setIsLoading(true);
+    console.log("[Submit] Starting profile submission...");
+    
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Request timed out. Please check your internet or Firebase Firestore setup.")), 15000)
+    );
+
     try {
-      // 1. Upload photos
-      const uploadedPhotoUrls = [];
-      for (let i = 0; i < photos.length; i++) {
-        const url = await uploadProfileImageAsync(photos[i], i);
-        uploadedPhotoUrls.push(url);
-      }
+      const photoUrls = photos.map(p => p.base64);
+      console.log(`[Submit] Saving profile for ${firstName} with ${photoUrls.length} photos...`);
 
-      // 2. Save profile
-      await saveUserProfileAsync({
-        firstName,
-        lastName,
-        dob,
-        gender,
-        interestedIn,
-        photoUrls: uploadedPhotoUrls,
-      });
+      // Race the save against the timeout
+      await Promise.race([
+        saveUserProfileAsync({
+          firstName,
+          lastName,
+          dob,
+          gender,
+          interestedIn,
+          interests,
+          photoUrls,
+        }),
+        timeoutPromise
+      ]);
 
-      // Navigate to the main app tab navigator
-      router.replace('/(tabs)/discover');
+      console.log("[Submit] Profile saved successfully!");
+      alert("Profile created! Welcome to Lynk 🎉");
+      router.replace('/discover');
       
     } catch (error: any) {
-      console.error(error);
-      alert("Failed to save profile: " + error.message);
+      console.error("[Submit] Error:", error);
+      alert("Error: " + error.message);
     } finally {
       setIsLoading(false);
     }
@@ -194,7 +246,7 @@ export default function ProfileSetupScreen() {
                   <View key={index} style={ProfileSetupStyles.photoBox}>
                     {hasPhoto ? (
                       <>
-                        <Image source={{ uri: photos[index] }} style={ProfileSetupStyles.photoImage} />
+                        <Image source={{ uri: photos[index].uri }} style={ProfileSetupStyles.photoImage} />
                         <TouchableOpacity style={ProfileSetupStyles.deletePhotoIcon} onPress={() => removePhoto(index)}>
                           <X color="#FFFFFF" size={16} weight="bold" />
                         </TouchableOpacity>
@@ -212,6 +264,37 @@ export default function ProfileSetupScreen() {
             </View>
           </>
         );
+      case 5:
+        return (
+          <>
+            <Text style={ProfileSetupStyles.titleText}>Your interests</Text>
+            <Text style={ProfileSetupStyles.subtitleText}>
+              Pick up to 5 things you love. This helps us find your perfect Lynk! ✨
+            </Text>
+
+            <View style={interestStyles.grid}>
+              {INTERESTS.map((item) => {
+                const selected = interests.includes(item);
+                return (
+                  <TouchableOpacity
+                    key={item}
+                    style={[interestStyles.chip, selected && interestStyles.chipActive]}
+                    onPress={() => toggleInterest(item)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[interestStyles.chipText, selected && interestStyles.chipTextActive]}>
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={interestStyles.counter}>
+              {interests.length}/5 selected
+            </Text>
+          </>
+        );
       default:
         return null;
     }
@@ -222,6 +305,7 @@ export default function ProfileSetupScreen() {
   else if (step === 2) canProceed = canProceedStep2;
   else if (step === 3) canProceed = canProceedStep3;
   else if (step === 4) canProceed = canProceedStep4;
+  else if (step === 5) canProceed = canProceedStep5;
 
   return (
     <KeyboardAvoidingView 
@@ -234,9 +318,14 @@ export default function ProfileSetupScreen() {
         </View>
       </View>
 
-      <View style={ProfileSetupStyles.contentContainer}>
+      <ScrollView
+        style={ProfileSetupStyles.contentContainer}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {renderStepContent()}
-      </View>
+      </ScrollView>
 
       <View style={ProfileSetupStyles.footerContainer}>
         {step > 1 ? (
@@ -257,7 +346,7 @@ export default function ProfileSetupScreen() {
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text style={ProfileSetupStyles.primaryButtonText}>
-              {step === totalSteps ? "Finish" : "Next"}
+              {step === totalSteps ? 'Finish 🎉' : 'Next'}
             </Text>
           )}
         </TouchableOpacity>
@@ -265,3 +354,40 @@ export default function ProfileSetupScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+// ─── Interests chip grid styles ───────────────────────────────────────────────
+const interestStyles = StyleSheet.create({
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
+  },
+  chipActive: {
+    borderColor: '#FF4D6D',
+    backgroundColor: '#FFF0F3',
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#888888',
+  },
+  chipTextActive: {
+    color: '#FF4D6D',
+  },
+  counter: {
+    marginTop: 16,
+    fontSize: 13,
+    color: '#BBBBBB',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+});

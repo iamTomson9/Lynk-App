@@ -32,7 +32,7 @@ export default function SplashScreen() {
           const profileDoc = await getDoc(doc(db, 'users', user.uid));
           if (profileDoc.exists() && profileDoc.data()?.firstName) {
             // Profile is complete → go to the main app
-            router.replace('/(tabs)/discover');
+            router.replace('/discover');
           } else {
             // Profile incomplete → go to setup wizard
             router.replace('/profile-setup');

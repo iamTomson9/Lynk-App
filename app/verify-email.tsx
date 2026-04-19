@@ -25,12 +25,20 @@ export default function VerifyEmailScreen() {
     setErrorMsg('');
 
     try {
-      // We must reload the user to get the latest emailVerified status from Firebase
+      // Reload to get latest verification status
       await user.reload();
       
       if (auth.currentUser?.emailVerified) {
-        // Success!
-        router.replace('/profile-setup');
+        // Now check if they have a profile already
+        const { getDoc, doc } = require('firebase/firestore');
+        const { db } = require('../firebaseConfig');
+        const profileDoc = await getDoc(doc(db, 'users', user.uid));
+        
+        if (profileDoc.exists() && profileDoc.data()?.firstName) {
+          router.replace('/discover');
+        } else {
+          router.replace('/profile-setup');
+        }
       } else {
         setErrorMsg('Email not verified yet. Please check your inbox and click the link.');
       }

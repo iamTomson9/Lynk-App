@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { PencilSimple, SignOut, GraduationCap, Gender, Heart } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from '../../firebaseConfig';
 import { ProfileTabStyles } from '../../styles/ProfileTabStyles';
 
@@ -45,7 +45,19 @@ export default function ProfileScreen() {
     try {
       const profileDoc = await getDoc(doc(db, 'users', currentUser.uid));
       if (profileDoc.exists()) {
-        setProfile(profileDoc.data() as UserProfile);
+        const data = profileDoc.data() as UserProfile;
+        
+        // If photos aren't in the main doc, try to fetch from sub-collection
+        if (!data.photoUrls || data.photoUrls.length === 0) {
+          const photosSnap = await getDocs(collection(db, 'users', currentUser.uid, 'photos'));
+          const fetchedPhotos = photosSnap.docs
+            .map(d => d.data())
+            .sort((a, b) => a.index - b.index)
+            .map(d => d.base64);
+          data.photoUrls = fetchedPhotos;
+        }
+        
+        setProfile(data);
       }
     } catch (e) {
       console.error('Failed to load profile:', e);

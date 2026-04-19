@@ -1,128 +1,61 @@
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { doc, setDoc } from 'firebase/firestore';
-import { storage, db, auth } from '../firebaseConfig';
-import { Platform } from 'react-native';
+import { doc, setDoc, collection } from 'firebase/firestore';
+import { db, auth } from '../firebaseConfig';
+
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 /**
- * Converts a local image URI to a base64 data URL.
- * Used as a fallback on web where Firebase Storage has CORS restrictions.
+ * Validates a file size against the 5MB limit.
  */
-const uriToBase64DataUrl = (uri: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.onload = function () {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(xhr.response);
-    };
-    xhr.onerror = () => reject(new TypeError('Network request failed while reading image'));
-    xhr.responseType = 'blob';
-    xhr.open('GET', uri, true);
-    xhr.send(null);
-  });
-};
-
-/**
- * Converts a local image URI into a Blob (used for native uploads).
- */
-const uriToBlob = (uri: string): Promise<Blob> => {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.onload = function () {
-      resolve(xhr.response);
-    };
-    xhr.onerror = () => reject(new TypeError('Network request failed while reading image'));
-    xhr.responseType = 'blob';
-    xhr.open('GET', uri, true);
-    xhr.send(null);
-  });
-};
-
-/**
- * Uploads an image to Firebase Storage (native) or returns a base64 data URL (web).
- * Returns a string URL that can be stored in Firestore and rendered in <Image />.
- */
-export const uploadProfileImageAsync = async (uri: string, index: number): Promise<string> => {
-  if (!auth.currentUser) throw new Error('No user logged in');
-
-  // ── Web: Firebase Storage CORS blocks localhost uploads.
-  //    We store a base64 data URL directly in Firestore instead.
-  if (Platform.OS === 'web') {
-    console.log(`[Upload] Web platform — converting image ${index} to base64...`);
-    const dataUrl = await uriToBase64DataUrl(uri);
-    console.log(`[Upload] Image ${index} converted successfully.`);
-    return dataUrl; // caller stores this in Firestore
+export const validateImageSize = (fileSizeBytes?: number): string | null => {
+  if (!fileSizeBytes) return null;
+  if (fileSizeBytes > MAX_FILE_SIZE_BYTES) {
+    const sizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(1);
+    return `Image is ${sizeMB}MB. Please choose a photo under 5MB.`;
   }
-
-  // ── Native (iOS / Android): use Firebase Storage as normal
-  console.log(`[Upload] Native platform — uploading image ${index} to Firebase Storage...`);
-
-  try {
-    const blob = await uriToBlob(uri);
-
-    const fileExtension = uri.split('.').pop()?.toLowerCase() || 'jpg';
-    const mimeType = fileExtension === 'png' ? 'image/png' : 'image/jpeg';
-    const fileRef = ref(
-      storage,
-      `users/${auth.currentUser.uid}/profile_${index}_${Date.now()}.${fileExtension}`
-    );
-
-    const uploadTask = uploadBytesResumable(fileRef, blob, { contentType: mimeType });
-
-    await new Promise<void>((resolve, reject) => {
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          console.log(`[Upload] Image ${index}: ${Math.round(progress)}% uploaded`);
-        },
-        (error) => {
-          console.error('[Upload] Firebase Storage error:', error.code, error.message, error);
-          reject(error);
-        },
-        () => resolve()
-      );
-    });
-
-    // Free blob memory
-    // @ts-ignore
-    if (blob.close) blob.close();
-
-    const downloadUrl = await getDownloadURL(fileRef);
-    console.log(`[Upload] Image ${index} uploaded to Storage. URL: ${downloadUrl}`);
-    return downloadUrl;
-
-  } catch (storageError: any) {
-    // ── Fallback: if Storage upload fails (e.g. rules not configured),
-    //    store as base64 in Firestore. Works on any platform.
-    console.warn(
-      `[Upload] Storage upload failed (${storageError?.code ?? 'unknown'}). ` +
-      `Falling back to base64 encoding for image ${index}.`
-    );
-    const dataUrl = await uriToBase64DataUrl(uri);
-    console.log(`[Upload] Image ${index} saved as base64 fallback.`);
-    return dataUrl;
-  }
+  return null;
 };
 
 /**
- * Saves the user's complete profile to Firestore.
+ * Saves the user's complete profile.
+ * IMPORTANT: To stay under Firestore's 1MB limit, we store NO photos in the main document.
+ * All photos are saved as individual documents in a sub-collection.
  */
 export const saveUserProfileAsync = async (profileData: any) => {
   if (!auth.currentUser) throw new Error('No user logged in');
+  const uid = auth.currentUser.uid;
 
-  const userRef = doc(db, 'users', auth.currentUser.uid);
+  console.log("[Firebase] Saving profile metadata...");
+  
+  const { photoUrls, ...metadata } = profileData;
 
+  // 1. Save metadata to main document (NO photos here)
+  const userRef = doc(db, 'users', uid);
   await setDoc(
     userRef,
     {
-      ...profileData,
-      uid: auth.currentUser.uid,
+      ...metadata,
+      uid,
       email: auth.currentUser.email ?? null,
       createdAt: new Date(),
       completedOnboarding: true,
+      photoUrls: [], // Keep this empty to avoid the 1MB error
     },
-    { merge: true } // Don't overwrite existing fields we haven't touched
+    { merge: true }
   );
+
+  // 2. Save each photo to its own document in the sub-collection
+  // This allows each photo to have its own 1MB limit.
+  if (photoUrls && photoUrls.length > 0) {
+    console.log(`[Firebase] Saving ${photoUrls.length} photos separately...`);
+    const photoPromises = photoUrls.map((base64: string, index: number) => {
+      const photoDocRef = doc(db, 'users', uid, 'photos', `photo_${index}`);
+      return setDoc(photoDocRef, { 
+        base64, 
+        index, 
+        uploadedAt: new Date() 
+      });
+    });
+    await Promise.all(photoPromises);
+  }
+  console.log("[Firebase] All data saved successfully.");
 };
