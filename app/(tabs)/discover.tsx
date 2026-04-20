@@ -181,84 +181,6 @@ export default function DiscoverScreen() {
     loadProfiles();
   }, []);
 
-  const seedMockData = async () => {
-    setIsLoading(true);
-    console.log("[Seed] 🕵️ Checking Identity...");
-    console.log("[Seed] Current User UID:", auth.currentUser?.uid || "NOT LOGGED IN");
-    console.log("[Seed] Email Verified:", auth.currentUser?.emailVerified ? "YES" : "NO");
-
-    try {
-      const { MOCK_IMAGES } = require('../../utils/mockData');
-      const mockProfiles = [
-        {
-          id: 'mock_1',
-          firstName: 'Sarah',
-          lastName: 'Jenkins',
-          dob: '12/05/2004',
-          gender: 'Female',
-          interestedIn: 'Everyone',
-          photoUrls: [MOCK_IMAGES[0]],
-          university: 'University of Cape Town',
-        },
-        {
-          id: 'mock_2',
-          firstName: 'James',
-          lastName: 'Wilson',
-          dob: '22/09/2003',
-          gender: 'Male',
-          interestedIn: 'Everyone',
-          photoUrls: [MOCK_IMAGES[1]],
-          university: 'Stellenbosch University',
-        },
-        {
-          id: 'mock_3',
-          firstName: 'Maya',
-          lastName: 'Patel',
-          dob: '05/01/2005',
-          gender: 'Female',
-          interestedIn: 'Men',
-          photoUrls: [MOCK_IMAGES[2]],
-          university: 'Wits University',
-        }
-      ];
-
-      for (const profile of mockProfiles) {
-        console.log(`[Seed] Creating mock user: ${profile.firstName}...`);
-        const { photoUrls, ...metadata } = profile;
-        
-        // 1. Save metadata to main doc
-        await setDoc(doc(db, 'users', profile.id), {
-          ...metadata,
-          photoUrls: [], 
-          createdAt: serverTimestamp(),
-          completedOnboarding: true,
-        });
-        console.log(`[Seed] Metadata for ${profile.firstName} saved.`);
-
-        // 2. Save photos to sub-collection
-        if (photoUrls && photoUrls.length > 0) {
-          console.log(`[Seed] Saving photos for ${profile.firstName}...`);
-          for (let i = 0; i < photoUrls.length; i++) {
-            await setDoc(doc(db, 'users', profile.id, 'photos', `photo_${i}`), {
-              base64: photoUrls[i],
-              index: i,
-              uploadedAt: new Date()
-            });
-          }
-          console.log(`[Seed] Photos for ${profile.firstName} saved.`);
-        }
-      }
-
-      console.log("[Seed] ALL MOCK DATA SAVED SUCCESSFULLY!");
-      alert('Mock data seeded! Enjoy swiping! 💫');
-      loadProfiles();
-    } catch (e) {
-      console.error('Failed to seed mock data:', e);
-      alert('Failed to seed data. Check console.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const loadProfiles = async () => {
     if (!currentUser) return;
@@ -384,13 +306,6 @@ export default function DiscoverScreen() {
           <Text style={DiscoverStyles.emptySubtitle}>
             Check back later — new people join Lynk every day. 💫
           </Text>
-          
-          <TouchableOpacity 
-            style={[DiscoverStyles.primaryBtn, { marginTop: 24, paddingHorizontal: 30 }]} 
-            onPress={seedMockData}
-          >
-            <Text style={DiscoverStyles.primaryBtnText}>Seed Mock Data</Text>
-          </TouchableOpacity>
         </View>
       ) : (
         <View style={DiscoverStyles.cardStack}>
