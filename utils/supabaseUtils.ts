@@ -12,6 +12,25 @@ export const validateImageSize = (fileSizeBytes?: number): string | null => {
   return null;
 };
 
+/**
+ * Resolves a Firebase UID (text) to the Supabase profiles.id (uuid).
+ * All foreign keys in the database reference profiles.id, so this helper
+ * must be used whenever the code needs to write to club_members,
+ * club_messages, profile_photos, etc.
+ */
+export const getSupabaseProfileId = async (firebaseUid?: string): Promise<string | null> => {
+  const uid = firebaseUid ?? auth.currentUser?.uid;
+  if (!uid) return null;
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', uid)
+    .single();
+
+  return data?.id ?? null;
+};
+
 export const saveUserProfileAsync = async (profileData: any) => {
   if (!auth.currentUser) throw new Error('No user logged in');
   const uid = auth.currentUser.uid;
@@ -54,9 +73,11 @@ export const saveUserProfileAsync = async (profileData: any) => {
     .single();
 
   let profileError;
+  let profileId: string;
 
   if (existing) {
     // Update existing profile
+    profileId = existing.id;
     const { error } = await supabase
       .from('profiles')
       .update(supabaseMetadata)
@@ -64,13 +85,16 @@ export const saveUserProfileAsync = async (profileData: any) => {
     profileError = error;
   } else {
     // Insert new profile — let Supabase generate the UUID id
-    const { error } = await supabase
+    const { data: newRow, error } = await supabase
       .from('profiles')
       .insert({
         user_id: uid,
         ...supabaseMetadata,
-      });
+      })
+      .select('id')
+      .single();
     profileError = error;
+    profileId = newRow?.id;
   }
 
   if (profileError) {
@@ -78,16 +102,16 @@ export const saveUserProfileAsync = async (profileData: any) => {
     throw profileError;
   }
 
-  // 2. Save each photo to profile_photos table
-  if (photoUrls && photoUrls.length > 0) {
+  // 2. Save each photo to profile_photos table (uses the real Supabase UUID)
+  if (photoUrls && photoUrls.length > 0 && profileId) {
     console.log(`[Supabase] Saving ${photoUrls.length} photos...`);
     
     // First, delete existing photos for this user to avoid duplicates if they re-upload
-    await supabase.from('profile_photos').delete().eq('profile_id', uid);
+    await supabase.from('profile_photos').delete().eq('profile_id', profileId);
 
     const photoPromises = photoUrls.map((base64: string, index: number) => {
       return supabase.from('profile_photos').insert({
-        profile_id: uid,
+        profile_id: profileId,
         storage_path: base64,
         sort_order: index,
       });

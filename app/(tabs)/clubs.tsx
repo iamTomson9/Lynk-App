@@ -6,6 +6,7 @@ import { getClubs, rsvpToEvent } from '../../utils/lynkData';
 import { LynkClub } from '../../utils/lynkTypes';
 import { supabase } from '../../utils/supabase';
 import { auth } from '../../firebaseConfig';
+import { getSupabaseProfileId } from '../../utils/supabaseUtils';
 
 export default function ClubsScreen() {
   const router = useRouter();
@@ -26,20 +27,23 @@ export default function ClubsScreen() {
       setClubs(items);
     } else {
       if (auth.currentUser) {
-        const { data } = await supabase
-          .from('club_members')
-          .select('club_id, clubs(*)')
-          .eq('profile_id', auth.currentUser.uid);
-          
-        if (data) {
-          const myClubs = data.map((d: any) => ({
-            id: d.clubs.id,
-            name: d.clubs.name,
-            category: d.clubs.category,
-            description: d.clubs.description,
-            memberCount: d.clubs.member_count,
-          }));
-          setJoinedClubs(myClubs);
+        const profileId = await getSupabaseProfileId();
+        if (profileId) {
+          const { data } = await supabase
+            .from('club_members')
+            .select('club_id, clubs(*)')
+            .eq('profile_id', profileId);
+            
+          if (data) {
+            const myClubs = data.map((d: any) => ({
+              id: d.clubs.id,
+              name: d.clubs.name,
+              category: d.clubs.category,
+              description: d.clubs.description,
+              memberCount: d.clubs.member_count,
+            }));
+            setJoinedClubs(myClubs);
+          }
         }
       }
     }

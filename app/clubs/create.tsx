@@ -3,7 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform
 import { CaretLeft } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../utils/supabase';
-import { auth } from '../../firebaseConfig'; // To get current user ID
+import { auth } from '../../firebaseConfig';
+import { getSupabaseProfileId } from '../../utils/supabaseUtils';
 
 const CATEGORIES = ['Academics', 'Sports', 'Arts', 'Tech', 'Social', 'Other'];
 
@@ -19,12 +20,19 @@ export default function CreateClubScreen() {
   async function handleCreate() {
     if (!canCreate || !auth.currentUser) return;
     setIsLoading(true);
+
+    const profileId = await getSupabaseProfileId();
+    if (!profileId) {
+      alert('Profile not found. Please complete your profile setup first.');
+      setIsLoading(false);
+      return;
+    }
     
     const { data, error } = await supabase.from('clubs').insert({
       name: name.trim(),
       description: description.trim(),
       category: category,
-      created_by: auth.currentUser.uid,
+      created_by: profileId,
       member_count: 1
     }).select().single();
 

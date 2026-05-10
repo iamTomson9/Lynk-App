@@ -4,6 +4,7 @@ import { CaretLeft, PaperPlaneRight } from 'phosphor-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../utils/supabase';
 import { auth } from '../../firebaseConfig';
+import { getSupabaseProfileId } from '../../utils/supabaseUtils';
 
 export default function GroupChatScreen() {
   const { id } = useLocalSearchParams();
@@ -11,9 +12,13 @@ export default function GroupChatScreen() {
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
   const [clubName, setClubName] = useState('Group Chat');
+  const [myProfileId, setMyProfileId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id || typeof id !== 'string') return;
+
+    // Resolve my Supabase profile UUID
+    getSupabaseProfileId().then((pid) => setMyProfileId(pid));
 
     // Load group name
     supabase.from('clubs').select('name').eq('id', id).single().then(({ data }) => {
@@ -64,11 +69,11 @@ export default function GroupChatScreen() {
   }, [id]);
 
   async function handleSend() {
-    if (!inputText.trim() || !auth.currentUser || !id) return;
+    if (!inputText.trim() || !myProfileId || !id) return;
 
     const { error } = await supabase.from('club_messages').insert({
       club_id: id,
-      sender_id: auth.currentUser.uid,
+      sender_id: myProfileId,
       body: inputText.trim()
     });
 
@@ -78,7 +83,7 @@ export default function GroupChatScreen() {
   }
 
   const renderMessage = ({ item }: { item: any }) => {
-    const isMe = item.sender_id === auth.currentUser?.uid;
+    const isMe = item.sender_id === myProfileId;
     
     return (
       <View style={[styles.messageWrapper, isMe ? styles.messageWrapperMe : styles.messageWrapperOther]}>

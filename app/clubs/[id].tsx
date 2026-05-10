@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../utils/supabase';
 import { LynkClub } from '../../utils/lynkTypes';
 import { auth } from '../../firebaseConfig';
+import { getSupabaseProfileId } from '../../utils/supabaseUtils';
 
 export default function GroupDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -31,15 +32,18 @@ export default function GroupDetailsScreen() {
 
       // Check if user is a member
       if (auth.currentUser) {
-        const { data: memberData } = await supabase
-          .from('club_members')
-          .select('*')
-          .eq('club_id', id)
-          .eq('profile_id', auth.currentUser.uid)
-          .single();
+        const profileId = await getSupabaseProfileId();
+        if (profileId) {
+          const { data: memberData } = await supabase
+            .from('club_members')
+            .select('*')
+            .eq('club_id', id)
+            .eq('profile_id', profileId)
+            .single();
 
-        if (memberData) {
-          setIsMember(true);
+          if (memberData) {
+            setIsMember(true);
+          }
         }
       }
 
@@ -53,9 +57,16 @@ export default function GroupDetailsScreen() {
     if (!auth.currentUser || !club) return;
     setLoading(true);
     
+    const profileId = await getSupabaseProfileId();
+    if (!profileId) {
+      alert('Profile not found. Please complete your profile first.');
+      setLoading(false);
+      return;
+    }
+
     const { error } = await supabase.from('club_members').insert({
       club_id: club.id,
-      profile_id: auth.currentUser.uid,
+      profile_id: profileId,
     });
 
     if (!error) {
