@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Heart, Phone, Envelope, Sparkle } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LoginStyles } from '../styles/LoginStyles';
 
 export default function LoginScreen() {
@@ -62,7 +63,10 @@ export default function LoginScreen() {
 
       <TouchableOpacity
         style={LoginStyles.demoButton}
-        onPress={() => router.replace('/discover')}
+        onPress={async () => {
+          await AsyncStorage.setItem('lynk.isInvestorMode', 'true');
+          router.replace('/discover');
+        }}
         activeOpacity={0.8}
       >
         <Sparkle weight="fill" size={22} color="#7C3AED" />

@@ -16,6 +16,11 @@ import { supabase } from './supabase';
 
 export const isSupabaseConfigured = Boolean(process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
 
+export async function isInvestorModeActive(): Promise<boolean> {
+  const isInvestor = await AsyncStorage.getItem('lynk.isInvestorMode');
+  return isInvestor === 'true';
+}
+
 async function supabaseRest<T>(table: string, query = '*'): Promise<T[] | null> {
   if (!isSupabaseConfigured) return null;
 
@@ -97,6 +102,9 @@ export async function getDiscoveryProfiles(): Promise<LynkProfile[]> {
     }));
   }
 
+  const isInvestor = await isInvestorModeActive();
+  if (!isInvestor) return [];
+
   const swiped = await readJson<string[]>(STORAGE_KEYS.swiped, []);
   const current = await getCurrentProfile();
   return demoProfiles.filter((profile) => {
@@ -134,11 +142,13 @@ export async function recordSwipe(profile: LynkProfile, action: SwipeAction): Pr
 }
 
 export async function getMatches(): Promise<LynkMatch[]> {
-  return readJson<LynkMatch[]>(STORAGE_KEYS.matches, demoMatches);
+  const isInvestor = await isInvestorModeActive();
+  return readJson<LynkMatch[]>(STORAGE_KEYS.matches, isInvestor ? demoMatches : []);
 }
 
 export async function getMessages(matchId = 'match-ama'): Promise<LynkMessage[]> {
-  const allMessages = await readJson<LynkMessage[]>(STORAGE_KEYS.messages, demoMessages);
+  const isInvestor = await isInvestorModeActive();
+  const allMessages = await readJson<LynkMessage[]>(STORAGE_KEYS.messages, isInvestor ? demoMessages : []);
   return allMessages.filter((message) => message.matchId === matchId);
 }
 
@@ -192,7 +202,8 @@ export async function getClubs(): Promise<LynkClub[]> {
     }));
   }
 
-  return demoClubs;
+  const isInvestor = await isInvestorModeActive();
+  return isInvestor ? demoClubs : [];
 }
 
 export async function rsvpToEvent(eventId: string): Promise<void> {

@@ -12,7 +12,7 @@ export type LynkProfile = {
   interests: string[];
   hobbies: string[];
   photos: string[];
-  university: string;
+  occupation: string;
   distanceKm: number;
   relationshipGoal?: string;
   sexualOrientation?: string;
@@ -29,7 +29,7 @@ export type CurrentProfileInput = {
   interests: string[];
   hobbies: string[];
   photos: string[];
-  university: string;
+  occupation: string;
   preferredGenders: string[];
   preferredMinAge: number;
   preferredMaxAge: number;

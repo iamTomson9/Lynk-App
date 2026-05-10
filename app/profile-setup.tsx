@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { ProfileSetupStyles } from '../styles/ProfileSetupStyles';
 import { saveCurrentProfile } from '../utils/lynkData';
 import { UserIntent } from '../utils/lynkTypes';
+import { saveUserProfileAsync } from '../utils/supabaseUtils';
 
 const INTERESTS = ['Music', 'Fitness', 'Travel', 'Photography', 'Gaming', 'Cooking', 'Reading', 'Art', 'Sports', 'Movies', 'Nature', 'Tech'];
 const GENDERS = ['Woman', 'Man', 'Non-binary'];
@@ -25,6 +26,7 @@ export default function ProfileSetupScreen() {
   const [intent, setIntent] = useState<UserIntent>('friends');
   const [fullName, setFullName] = useState('');
   const [age, setAge] = useState('');
+  const [occupation, setOccupation] = useState('');
   const [gender, setGender] = useState('Woman');
   const [bio, setBio] = useState('');
   const [interests, setInterests] = useState<string[]>(['Tech']);
@@ -53,7 +55,7 @@ export default function ProfileSetupScreen() {
 
   async function finish() {
     setIsLoading(true);
-    await saveCurrentProfile({
+    const newProfile = {
       fullName: fullName.trim() || 'Demo User',
       displayName: fullName.trim().split(' ')[0] || 'Demo',
       age: parsedAge || 21,
@@ -63,19 +65,21 @@ export default function ProfileSetupScreen() {
       interests,
       hobbies: interests,
       photos: [],
-      university: 'University of Botswana',
+      occupation: occupation.trim() || 'Student',
       preferredGenders,
       preferredMinAge: intent === 'dating' ? 18 : 16,
       preferredMaxAge: 30,
       discoveryRadiusKm: Number(radius) || 25,
       relationshipGoal: intent === 'dating' ? relationshipGoal : undefined,
       sexualOrientation: intent === 'dating' ? 'Prefer not to say' : undefined,
-    });
+    };
+    await saveCurrentProfile(newProfile);
+    await saveUserProfileAsync(newProfile);
     setIsLoading(false);
     router.replace('/discover');
   }
 
-  function next() {
+  function handleNext() {
     if (step < totalSteps) setStep(step + 1);
     else finish();
   }
@@ -125,6 +129,9 @@ export default function ProfileSetupScreen() {
             </View>
             <View style={ProfileSetupStyles.inputWrapper}>
               <TextInput style={ProfileSetupStyles.textInput} placeholder="Age" placeholderTextColor="#999999" keyboardType="number-pad" value={age} onChangeText={setAge} />
+            </View>
+            <View style={ProfileSetupStyles.inputWrapper}>
+              <TextInput style={ProfileSetupStyles.textInput} placeholder="Occupation / University" placeholderTextColor="#999999" value={occupation} onChangeText={setOccupation} />
             </View>
             <View style={ProfileSetupStyles.chipRow}>
               {GENDERS.map((item) => (
@@ -208,7 +215,7 @@ export default function ProfileSetupScreen() {
         ) : (
           <View style={ProfileSetupStyles.navButton} />
         )}
-        <TouchableOpacity style={[ProfileSetupStyles.primaryButton, !canContinue && ProfileSetupStyles.primaryButtonDisabled]} onPress={next} disabled={!canContinue || isLoading}>
+        <TouchableOpacity style={[ProfileSetupStyles.primaryButton, !canContinue && ProfileSetupStyles.primaryButtonDisabled]} onPress={handleNext} disabled={!canContinue || isLoading}>
           {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={ProfileSetupStyles.primaryButtonText}>{step === totalSteps ? 'Finish' : 'Next'}</Text>}
         </TouchableOpacity>
       </View>

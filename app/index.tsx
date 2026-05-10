@@ -3,6 +3,7 @@ import { View, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Heart } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
@@ -47,8 +48,13 @@ export default function SplashScreen() {
           router.replace('/profile-setup');
         }
       } else {
-        // Not logged in
-        router.replace('/login');
+        // Not logged in, but check if Investor Demo Mode is active
+        const isInvestorMode = await AsyncStorage.getItem('lynk.isInvestorMode');
+        if (isInvestorMode === 'true') {
+          router.replace('/discover');
+        } else {
+          router.replace('/login');
+        }
       }
     });
 
