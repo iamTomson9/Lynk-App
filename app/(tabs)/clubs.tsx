@@ -29,7 +29,7 @@ export default function ClubsScreen() {
         const { data } = await supabase
           .from('club_members')
           .select('club_id, clubs(*)')
-          .eq('user_id', auth.currentUser.uid);
+          .eq('profile_id', auth.currentUser.uid);
           
         if (data) {
           const myClubs = data.map((d: any) => ({

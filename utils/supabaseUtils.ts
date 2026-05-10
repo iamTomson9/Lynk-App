@@ -20,35 +20,58 @@ export const saveUserProfileAsync = async (profileData: any) => {
   
   const { photoUrls, ...metadata } = profileData;
 
-    // 1. Save metadata to profiles table
-    // Map camelCase fields to snake_case for Supabase
-    const supabaseMetadata = {
-      full_name: metadata.fullName,
-      display_name: metadata.displayName,
-      date_of_birth: new Date(new Date().getFullYear() - (metadata.age || 21), 0, 1).toISOString(), // rough date of birth based on age
-      gender: metadata.gender,
-      intent: metadata.intent,
-      bio: metadata.bio,
-      interests: metadata.interests,
-      hobbies: metadata.hobbies,
-      occupation: metadata.occupation,
-      discovery_radius_km: metadata.discoveryRadiusKm,
-      preferred_genders: metadata.preferredGenders,
-      preferred_min_age: metadata.preferredMinAge,
-      preferred_max_age: metadata.preferredMaxAge,
-      relationship_goal: metadata.relationshipGoal,
-      sexual_orientation: metadata.sexualOrientation,
-    };
+  // Map camelCase fields to snake_case for Supabase
+  const supabaseMetadata: Record<string, any> = {
+    full_name: metadata.fullName,
+    display_name: metadata.displayName,
+    date_of_birth: new Date(new Date().getFullYear() - (metadata.age || 21), 0, 1).toISOString().split('T')[0],
+    gender: metadata.gender,
+    intent: metadata.intent,
+    bio: metadata.bio ?? '',
+    interests: metadata.interests ?? [],
+    hobbies: metadata.hobbies ?? [],
+    occupation: metadata.occupation ?? 'Student',
+    discovery_radius_km: metadata.discoveryRadiusKm ?? 25,
+    preferred_genders: metadata.preferredGenders ?? [],
+    preferred_min_age: metadata.preferredMinAge ?? 18,
+    preferred_max_age: metadata.preferredMaxAge ?? 30,
+    sexual_orientation: metadata.sexualOrientation ?? null,
+    email: auth.currentUser.email ?? null,
+    updated_at: new Date().toISOString(),
+    is_profile_complete: true,
+  };
 
-    const { error: profileError } = await supabase
+  // Only include relationship_goal if it's a valid enum value
+  if (metadata.relationshipGoal && ['relationship', 'casual', 'unsure', 'prefer_not_to_say'].includes(metadata.relationshipGoal)) {
+    supabaseMetadata.relationship_goal = metadata.relationshipGoal;
+  }
+
+  // Check if a profile already exists for this Firebase user
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', uid)
+    .single();
+
+  let profileError;
+
+  if (existing) {
+    // Update existing profile
+    const { error } = await supabase
       .from('profiles')
-      .upsert({
-        id: uid, // Use Firebase UID as the profile ID
+      .update(supabaseMetadata)
+      .eq('id', existing.id);
+    profileError = error;
+  } else {
+    // Insert new profile — let Supabase generate the UUID id
+    const { error } = await supabase
+      .from('profiles')
+      .insert({
+        user_id: uid,
         ...supabaseMetadata,
-      email: auth.currentUser.email ?? null,
-      updated_at: new Date().toISOString(),
-      completed_onboarding: true,
-    });
+      });
+    profileError = error;
+  }
 
   if (profileError) {
     console.error('Error saving profile:', profileError);
@@ -60,13 +83,13 @@ export const saveUserProfileAsync = async (profileData: any) => {
     console.log(`[Supabase] Saving ${photoUrls.length} photos...`);
     
     // First, delete existing photos for this user to avoid duplicates if they re-upload
-    await supabase.from('profile_photos').delete().eq('user_id', uid);
+    await supabase.from('profile_photos').delete().eq('profile_id', uid);
 
     const photoPromises = photoUrls.map((base64: string, index: number) => {
       return supabase.from('profile_photos').insert({
-        user_id: uid,
-        base64_data: base64,
-        index_order: index,
+        profile_id: uid,
+        storage_path: base64,
+        sort_order: index,
       });
     });
     

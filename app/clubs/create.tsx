@@ -24,7 +24,7 @@ export default function CreateClubScreen() {
       name: name.trim(),
       description: description.trim(),
       category: category,
-      owner_id: auth.currentUser.uid,
+      created_by: auth.currentUser.uid,
       member_count: 1
     }).select().single();
 

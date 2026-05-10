@@ -94,7 +94,7 @@ export async function getDiscoveryProfiles(): Promise<LynkProfile[]> {
       interests: profile.interests ?? [],
       hobbies: profile.hobbies ?? [],
       photos: profile.profile_photo_url ? [profile.profile_photo_url] : ['https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800'],
-      university: profile.university ?? 'Campus',
+      occupation: profile.occupation ?? 'Not specified',
       distanceKm: 1,
       relationshipGoal: profile.relationship_goal?.replaceAll('_', ' '),
       sexualOrientation: profile.sexual_orientation,

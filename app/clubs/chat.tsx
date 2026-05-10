@@ -26,10 +26,10 @@ export default function GroupChatScreen() {
         .from('club_messages')
         .select(`
           id,
-          content,
+          body,
           created_at,
-          user_id,
-          profiles:user_id ( display_name )
+          sender_id,
+          profiles:sender_id ( display_name )
         `)
         .eq('club_id', id)
         .order('created_at', { ascending: true });
@@ -47,7 +47,7 @@ export default function GroupChatScreen() {
         { event: 'INSERT', schema: 'public', table: 'club_messages', filter: `club_id=eq.${id}` },
         async (payload) => {
           // Fetch the profile for the new message to get the display_name
-          const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', payload.new.user_id).single();
+          const { data: profile } = await supabase.from('profiles').select('display_name').eq('id', payload.new.sender_id).single();
           
           const newMessage = {
             ...payload.new,
@@ -68,8 +68,8 @@ export default function GroupChatScreen() {
 
     const { error } = await supabase.from('club_messages').insert({
       club_id: id,
-      user_id: auth.currentUser.uid,
-      content: inputText.trim()
+      sender_id: auth.currentUser.uid,
+      body: inputText.trim()
     });
 
     if (!error) {
@@ -78,14 +78,14 @@ export default function GroupChatScreen() {
   }
 
   const renderMessage = ({ item }: { item: any }) => {
-    const isMe = item.user_id === auth.currentUser?.uid;
+    const isMe = item.sender_id === auth.currentUser?.uid;
     
     return (
       <View style={[styles.messageWrapper, isMe ? styles.messageWrapperMe : styles.messageWrapperOther]}>
         {!isMe && <Text style={styles.senderName}>{item.profiles?.display_name || 'User'}</Text>}
         <View style={[styles.messageBubble, isMe ? styles.messageBubbleMe : styles.messageBubbleOther]}>
           <Text style={[styles.messageText, isMe ? styles.messageTextMe : styles.messageTextOther]}>
-            {item.content}
+            {item.body}
           </Text>
         </View>
       </View>

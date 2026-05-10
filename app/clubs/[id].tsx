@@ -35,7 +35,7 @@ export default function GroupDetailsScreen() {
           .from('club_members')
           .select('*')
           .eq('club_id', id)
-          .eq('user_id', auth.currentUser.uid)
+          .eq('profile_id', auth.currentUser.uid)
           .single();
 
         if (memberData) {
@@ -55,7 +55,7 @@ export default function GroupDetailsScreen() {
     
     const { error } = await supabase.from('club_members').insert({
       club_id: club.id,
-      user_id: auth.currentUser.uid,
+      profile_id: auth.currentUser.uid,
     });
 
     if (!error) {
