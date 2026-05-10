@@ -87,6 +87,91 @@ export const ProfileSetupStyles = StyleSheet.create({
   optionTextActive: {
     color: '#FF4D6D',
   },
+  intentCard: {
+    width: '100%',
+    minHeight: 118,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ECE7F8',
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    marginBottom: 14,
+    flexDirection: 'row',
+    gap: 14,
+    alignItems: 'center',
+  },
+  intentCardActive: {
+    backgroundColor: '#FF4D6D',
+    borderColor: '#FF4D6D',
+  },
+  intentTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    marginBottom: 6,
+  },
+  intentTitleActive: {
+    color: '#FFFFFF',
+  },
+  intentBody: {
+    fontSize: 13,
+    color: '#666666',
+    lineHeight: 19,
+  },
+  intentBodyActive: {
+    color: '#FFFFFF',
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 18,
+  },
+  chip: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E4E0EA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipActive: {
+    backgroundColor: '#FFF0F3',
+    borderColor: '#FF4D6D',
+  },
+  chipText: {
+    color: '#5F586A',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  chipTextActive: {
+    color: '#FF4D6D',
+  },
+  counterText: {
+    color: '#777777',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  summaryBox: {
+    borderRadius: 18,
+    backgroundColor: '#F8F4FF',
+    borderWidth: 1,
+    borderColor: '#E9DFFF',
+    padding: 18,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#251047',
+    marginBottom: 8,
+  },
+  summaryText: {
+    fontSize: 14,
+    color: '#51465F',
+    lineHeight: 22,
+  },
   // Photo Grid
   photoGrid: {
     flexDirection: 'row',

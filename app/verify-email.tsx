@@ -4,6 +4,7 @@ import { Heart, EnvelopeOpen } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { sendEmailVerification } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
+import { supabase } from '../utils/supabase';
 import { VerifyEmailStyles } from '../styles/VerifyEmailStyles';
 
 export default function VerifyEmailScreen() {
@@ -29,12 +30,14 @@ export default function VerifyEmailScreen() {
       await user.reload();
       
       if (auth.currentUser?.emailVerified) {
-        // Now check if they have a profile already
-        const { getDoc, doc } = require('firebase/firestore');
-        const { db } = require('../firebaseConfig');
-        const profileDoc = await getDoc(doc(db, 'users', user.uid));
+        // Now check if they have a profile already in Supabase
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('completed_onboarding')
+          .eq('id', user.uid)
+          .single();
         
-        if (profileDoc.exists() && profileDoc.data()?.firstName) {
+        if (!error && data?.completed_onboarding) {
           router.replace('/discover');
         } else {
           router.replace('/profile-setup');
@@ -82,7 +85,7 @@ export default function VerifyEmailScreen() {
       <Text style={VerifyEmailStyles.titleText}>Verify your email</Text>
       
       <Text style={VerifyEmailStyles.subtitleText}>
-        We've sent a verification link to{'\n'}
+        We sent a verification link to{'\n'}
         <Text style={VerifyEmailStyles.emailText}>{user?.email || 'your email'}</Text>.{'\n'}
         Please click the link to continue.
       </Text>
@@ -98,12 +101,12 @@ export default function VerifyEmailScreen() {
         {isLoading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={VerifyEmailStyles.verifyButtonText}>I've verified my email</Text>
+          <Text style={VerifyEmailStyles.verifyButtonText}>I verified my email</Text>
         )}
       </TouchableOpacity>
 
       <View style={VerifyEmailStyles.resendContainer}>
-        <Text style={VerifyEmailStyles.resendText}>Didn't receive the email?</Text>
+        <Text style={VerifyEmailStyles.resendText}>Did not receive the email?</Text>
         <TouchableOpacity onPress={handleResendEmail} disabled={isResending}>
           <Text style={VerifyEmailStyles.resendLink}>
             {isResending ? 'Sending...' : 'Resend'}

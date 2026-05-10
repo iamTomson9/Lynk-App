@@ -123,6 +123,24 @@ export const LoginStyles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 10,
   },
+  demoButton: {
+    width: '100%',
+    minHeight: 52,
+    backgroundColor: '#F2ECFF',
+    borderRadius: 26,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#D8C8FF',
+  },
+  demoButtonText: {
+    color: '#5B21B6',
+    fontSize: 15,
+    fontWeight: '800',
+    marginLeft: 10,
+  },
 
   // Footer
   footerContainer: {

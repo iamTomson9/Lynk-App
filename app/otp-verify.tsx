@@ -104,7 +104,7 @@ export default function OTPVerifyScreen() {
           </TouchableOpacity>
 
           <View style={OTPVerifyStyles.resendContainer}>
-            <Text style={OTPVerifyStyles.resendText}>Didn't receive OTP?</Text>
+            <Text style={OTPVerifyStyles.resendText}>Did not receive OTP?</Text>
             <TouchableOpacity onPress={() => router.back()}>
               <Text style={OTPVerifyStyles.resendLink}>Resend Code</Text>
             </TouchableOpacity>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Heart, FacebookLogo, GoogleLogo } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
@@ -21,7 +21,7 @@ export default function PhoneAuthScreen() {
     if (!window.recaptchaVerifier) {
       window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         'size': 'invisible', // Invisible so the user doesn't have to click "I am not a robot"
-        'callback': (response) => {
+        'callback': (_response: unknown) => {
           console.log("Recaptcha verified!");
         }
       });
@@ -49,7 +49,10 @@ export default function PhoneAuthScreen() {
       
       // Combine the country code and the phone number (E.164 format required by Firebase)
       const formattedNumber = `+267${phoneNumber}`;
-      const appVerifier = window.recaptchaVerifier;
+      const appVerifier = window.recaptchaVerifier ?? undefined;
+      if (!appVerifier) {
+        throw new Error('Could not initialize phone verification.');
+      }
 
       // Ask Firebase to send the SMS
       const confirmationResult = await signInWithPhoneNumber(auth, formattedNumber, appVerifier);
@@ -76,7 +79,7 @@ export default function PhoneAuthScreen() {
       if (window.recaptchaVerifier) {
         try {
           window.recaptchaVerifier.clear();
-        } catch(e) {}
+        } catch {}
         window.recaptchaVerifier = null;
         
         // Sometimes Firebase leaves DOM nodes behind, clear them manually for web
@@ -99,7 +102,7 @@ export default function PhoneAuthScreen() {
         <Heart weight="fill" size={16} color="#E82B73" style={PhoneAuthStyles.headerRightHeart} />
       </View>
 
-      <Text style={PhoneAuthStyles.titleText}>Let's start with your number</Text>
+      <Text style={PhoneAuthStyles.titleText}>Start with your number</Text>
 
       <View style={PhoneAuthStyles.inputWrapper}>
         <View style={PhoneAuthStyles.countryCodeBox}>
@@ -150,7 +153,7 @@ export default function PhoneAuthScreen() {
       </TouchableOpacity>
 
       <View style={PhoneAuthStyles.footerContainer}>
-        <Text style={PhoneAuthStyles.footerText}>Don't have an account?</Text>
+        <Text style={PhoneAuthStyles.footerText}>Do not have an account?</Text>
         <TouchableOpacity>
           <Text style={PhoneAuthStyles.footerLink}>Sign Up</Text>
         </TouchableOpacity>

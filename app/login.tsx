@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { Heart, Phone, Envelope } from 'phosphor-react-native';
+import { Heart, Phone, Envelope, Sparkle } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { LoginStyles } from '../styles/LoginStyles';
 
@@ -60,9 +60,18 @@ export default function LoginScreen() {
         <Text style={LoginStyles.secondaryButtonText}>Continue with Phone</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={LoginStyles.demoButton}
+        onPress={() => router.replace('/discover')}
+        activeOpacity={0.8}
+      >
+        <Sparkle weight="fill" size={22} color="#7C3AED" />
+        <Text style={LoginStyles.demoButtonText}>Investor Demo Mode</Text>
+      </TouchableOpacity>
+
       {/* 5. Footer */}
       <View style={LoginStyles.footerContainer}>
-        <Text style={LoginStyles.footerText}>Don't have an account?</Text>
+        <Text style={LoginStyles.footerText}>Do not have an account?</Text>
         <TouchableOpacity>
           <Text style={LoginStyles.footerLink}>Sign Up</Text>
         </TouchableOpacity>

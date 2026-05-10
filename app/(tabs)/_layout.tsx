@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Sparkle, Heart, ChatCircle, User } from 'phosphor-react-native';
+import { Sparkle, Heart, ChatCircle, User, UsersThree } from 'phosphor-react-native';
 
 // The primary brand colour for active tabs
 const PINK = '#FF4D6D';
@@ -62,6 +62,19 @@ export default function TabLayout() {
           title: 'Messages',
           tabBarIcon: ({ color, focused }) => (
             <ChatCircle
+              size={focused ? 28 : 24}
+              weight={focused ? 'fill' : 'regular'}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="clubs"
+        options={{
+          title: 'Clubs',
+          tabBarIcon: ({ color, focused }) => (
+            <UsersThree
               size={focused ? 28 : 24}
               weight={focused ? 'fill' : 'regular'}
               color={color}

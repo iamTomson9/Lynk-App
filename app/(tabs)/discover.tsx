@@ -1,421 +1,151 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View, Text, Image, TouchableOpacity, ActivityIndicator,
-  Animated, PanResponder, Dimensions, Modal,
-} from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Dimensions, Image, Modal, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkle, X, Heart, Star, ChatCircle } from 'phosphor-react-native';
+import { ChatCircle, Heart, ShieldWarning, SlidersHorizontal, Star, X } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
-import {
-  collection, getDocs, doc, setDoc, getDoc, query, where, serverTimestamp
-} from 'firebase/firestore';
-import { auth, db } from '../../firebaseConfig';
-import { DiscoverStyles, CARD_WIDTH } from '../../styles/DiscoverStyles';
+import { getCurrentProfile, getDiscoveryProfiles, isSupabaseConfigured, recordSwipe } from '../../utils/lynkData';
+import { CurrentProfileInput, LynkProfile } from '../../utils/lynkTypes';
 
-const { width, height } = Dimensions.get('window');
-const SWIPE_THRESHOLD = width * 0.3;
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = Math.min(width - 32, 396);
+const SWIPE_THRESHOLD = width * 0.26;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface UserProfile {
-  id: string;
-  firstName: string;
-  lastName: string;
-  dob: string;
-  gender: string;
-  interestedIn: string;
-  photoUrls: string[];
-  university?: string;
-}
-
-function calculateAge(dob: string): number {
-  // Expects DD/MM/YYYY
-  const parts = dob.split('/');
-  if (parts.length !== 3) return 0;
-  const birthday = new Date(+parts[2], +parts[1] - 1, +parts[0]);
-  const ageDiff = Date.now() - birthday.getTime();
-  return Math.abs(new Date(ageDiff).getUTCFullYear() - 1970);
-}
-
-// ─── Swipeable Card ───────────────────────────────────────────────────────────
-function SwipeCard({
-  profile,
-  onSwipeLeft,
-  onSwipeRight,
-  isTop,
-  cardIndex,
-}: {
-  profile: UserProfile;
-  onSwipeLeft: () => void;
-  onSwipeRight: () => void;
-  isTop: boolean;
-  cardIndex: number;
-}) {
+function ProfileCard({ profile, onLike, onPass }: { profile: LynkProfile; onLike: () => void; onPass: () => void }) {
   const position = useRef(new Animated.ValueXY()).current;
-  const likeOpacity = useRef(new Animated.Value(0)).current;
-  const passOpacity = useRef(new Animated.Value(0)).current;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => isTop,
-      onMoveShouldSetPanResponder: () => isTop,
-      onPanResponderMove: (_, gestureState) => {
-        position.setValue({ x: gestureState.dx, y: gestureState.dy });
-        // Fade in LIKE / PASS badges
-        if (gestureState.dx > 0) {
-          likeOpacity.setValue(Math.min(gestureState.dx / SWIPE_THRESHOLD, 1));
-          passOpacity.setValue(0);
-        } else {
-          passOpacity.setValue(Math.min(-gestureState.dx / SWIPE_THRESHOLD, 1));
-          likeOpacity.setValue(0);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > SWIPE_THRESHOLD) {
-          // Swipe right → LIKE
-          Animated.timing(position, {
-            toValue: { x: width * 1.5, y: gestureState.dy },
-            duration: 280,
-            useNativeDriver: true,
-          }).start(onSwipeRight);
-        } else if (gestureState.dx < -SWIPE_THRESHOLD) {
-          // Swipe left → PASS
-          Animated.timing(position, {
-            toValue: { x: -width * 1.5, y: gestureState.dy },
-            duration: 280,
-            useNativeDriver: true,
-          }).start(onSwipeLeft);
-        } else {
-          // Snap back
-          Animated.spring(position, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
-            friction: 5,
-          }).start();
-          likeOpacity.setValue(0);
-          passOpacity.setValue(0);
-        }
-      },
-    })
-  ).current;
-
   const rotate = position.x.interpolate({
     inputRange: [-width / 2, 0, width / 2],
-    outputRange: ['-8deg', '0deg', '8deg'],
+    outputRange: ['-7deg', '0deg', '7deg'],
     extrapolate: 'clamp',
   });
 
-  const scale = isTop ? 1 : Math.max(0.93 - cardIndex * 0.03, 0.87);
-  const translateY = isTop ? 0 : -cardIndex * 10;
-
-  const cardStyle = isTop
-    ? {
-        transform: [
-          { translateX: position.x },
-          { translateY: position.y },
-          { rotate },
-        ],
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderMove: (_, gesture) => position.setValue({ x: gesture.dx, y: gesture.dy }),
+    onPanResponderRelease: (_, gesture) => {
+      if (gesture.dx > SWIPE_THRESHOLD) {
+        Animated.timing(position, { toValue: { x: width * 1.4, y: gesture.dy }, duration: 220, useNativeDriver: true }).start(onLike);
+      } else if (gesture.dx < -SWIPE_THRESHOLD) {
+        Animated.timing(position, { toValue: { x: -width * 1.4, y: gesture.dy }, duration: 220, useNativeDriver: true }).start(onPass);
+      } else {
+        Animated.spring(position, { toValue: { x: 0, y: 0 }, useNativeDriver: true, friction: 6 }).start();
       }
-    : { transform: [{ scale }, { translateY }] };
-
-  const age = calculateAge(profile.dob);
-  const photoUrl = profile.photoUrls?.[0];
+    },
+  }), [onLike, onPass, position]);
 
   return (
-    <Animated.View
-      style={[DiscoverStyles.card, cardStyle]}
-      {...(isTop ? panResponder.panHandlers : {})}
-    >
-      {photoUrl ? (
-        <Image source={{ uri: photoUrl }} style={DiscoverStyles.cardImage} />
-      ) : (
-        <LinearGradient
-          colors={['#FA517C', '#A528CD']}
-          style={DiscoverStyles.cardImage}
-        />
+    <Animated.View style={[styles.card, { transform: [{ translateX: position.x }, { translateY: position.y }, { rotate }] }]} {...panResponder.panHandlers}>
+      <Image source={{ uri: profile.photos[0] }} style={styles.photo} />
+      <LinearGradient colors={['transparent', 'rgba(0,0,0,0.82)']} style={styles.photoShade} />
+      {profile.isPremium && (
+        <View style={styles.premiumPill}>
+          <Star size={13} color="#FFFFFF" weight="fill" />
+          <Text style={styles.premiumText}>Premium</Text>
+        </View>
       )}
-
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.75)']}
-        style={DiscoverStyles.cardGradient}
-      />
-
-      {/* LIKE Badge */}
-      {isTop && (
-        <Animated.View style={[DiscoverStyles.likeBadge, { opacity: likeOpacity }]}>
-          <Text style={DiscoverStyles.likeBadgeText}>LIKE</Text>
-        </Animated.View>
-      )}
-
-      {/* PASS Badge */}
-      {isTop && (
-        <Animated.View style={[DiscoverStyles.passBadge, { opacity: passOpacity }]}>
-          <Text style={DiscoverStyles.passBadgeText}>PASS</Text>
-        </Animated.View>
-      )}
-
-      <View style={DiscoverStyles.cardInfo}>
-        <Text style={DiscoverStyles.cardName}>
-          {profile.firstName}{' '}
-          <Text style={DiscoverStyles.cardAge}>{age}</Text>
-        </Text>
-        {profile.university && (
-          <Text style={DiscoverStyles.cardUniversity}>🎓 {profile.university}</Text>
-        )}
+      <View style={styles.cardBody}>
+        <Text style={styles.name}>{profile.displayName}, {profile.age}</Text>
+        <Text style={styles.school}>{profile.university} - {profile.distanceKm.toFixed(1)} km away</Text>
+        <View style={styles.intentRow}>
+          <Text style={styles.intentPill}>{profile.intent === 'friends' ? 'Friendship' : 'Dating'}</Text>
+          {profile.relationshipGoal ? <Text style={styles.intentPill}>{profile.relationshipGoal}</Text> : null}
+        </View>
+        <Text style={styles.bio}>{profile.bio}</Text>
+        <View style={styles.tagRow}>
+          {profile.interests.slice(0, 3).map((interest) => <Text key={interest} style={styles.tag}>{interest}</Text>)}
+        </View>
       </View>
     </Animated.View>
   );
 }
 
-// ─── Main Discover Screen ─────────────────────────────────────────────────────
 export default function DiscoverScreen() {
   const router = useRouter();
-  const [profiles, setProfiles] = useState<UserProfile[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [matchedProfile, setMatchedProfile] = useState<UserProfile | null>(null);
-  const [showMatchModal, setShowMatchModal] = useState(false);
-
-  const currentUser = auth.currentUser;
+  const [profiles, setProfiles] = useState<LynkProfile[]>([]);
+  const [currentProfile, setCurrentProfile] = useState<CurrentProfileInput | null>(null);
+  const [index, setIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [match, setMatch] = useState<LynkProfile | null>(null);
 
   useEffect(() => {
-    loadProfiles();
+    load();
   }, []);
 
+  async function load() {
+    setLoading(true);
+    const [viewer, discoverable] = await Promise.all([getCurrentProfile(), getDiscoveryProfiles()]);
+    setCurrentProfile(viewer);
+    setProfiles(discoverable);
+    setIndex(0);
+    setLoading(false);
+  }
 
-  const loadProfiles = async () => {
-    if (!currentUser) return;
-    setIsLoading(true);
-    try {
-      // Get the current user's own profile to know their gender preference
-      const myDoc = await getDoc(doc(db, 'users', currentUser.uid));
-      const myData = myDoc.data();
-      const interestedIn: string = myData?.interestedIn ?? 'Everyone';
+  async function swipe(action: 'like' | 'pass' | 'super_like') {
+    const profile = profiles[index];
+    if (!profile) return;
+    const newMatch = await recordSwipe(profile, action);
+    setIndex((value) => value + 1);
+    if (newMatch) setMatch(profile);
+  }
 
-      // Query all users excluding self
-      const snapshot = await getDocs(collection(db, 'users'));
-      const allProfiles: UserProfile[] = [];
-
-      for (const d of snapshot.docs) {
-        if (d.id === currentUser.uid) continue; // skip self
-
-        const data = d.data() as Omit<UserProfile, 'id'>;
-
-        // Simple gender filter
-        if (interestedIn !== 'Everyone') {
-          const targetGender = interestedIn === 'Women' ? 'Female' : 'Male';
-          if (data.gender !== targetGender) continue;
-        }
-
-        // Fetch the first photo from the sub-collection for this user
-        try {
-          const firstPhotoDoc = await getDoc(doc(db, 'users', d.id, 'photos', 'photo_0'));
-          if (firstPhotoDoc.exists()) {
-            data.photoUrls = [firstPhotoDoc.data().base64];
-          }
-        } catch (photoErr) {
-          console.warn(`Could not load photo for user ${d.id}`);
-        }
-
-        allProfiles.push({ id: d.id, ...data });
-      }
-
-      // Shuffle profiles for variety
-      allProfiles.sort(() => Math.random() - 0.5);
-      setProfiles(allProfiles);
-    } catch (e) {
-      console.error('Failed to load profiles:', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSwipeRight = async () => {
-    const likedProfile = profiles[currentIndex];
-    setCurrentIndex((prev) => prev + 1);
-
-    if (!currentUser || !likedProfile) return;
-
-    // Record the like in Firestore
-    await setDoc(
-      doc(db, 'likes', `${currentUser.uid}_${likedProfile.id}`),
-      {
-        from: currentUser.uid,
-        to: likedProfile.id,
-        createdAt: serverTimestamp(),
-      }
-    );
-
-    // Check if they already liked us back (mutual like = match!)
-    const reverseDoc = await getDoc(
-      doc(db, 'likes', `${likedProfile.id}_${currentUser.uid}`)
-    );
-
-    if (reverseDoc.exists()) {
-      // 🎉 It's a match!
-      const matchId = [currentUser.uid, likedProfile.id].sort().join('_');
-      await setDoc(doc(db, 'matches', matchId), {
-        users: [currentUser.uid, likedProfile.id],
-        createdAt: serverTimestamp(),
-      });
-      setMatchedProfile(likedProfile);
-      setShowMatchModal(true);
-    }
-  };
-
-  const handleSwipeLeft = () => {
-    setCurrentIndex((prev) => prev + 1);
-  };
-
-  const handleActionPass = () => {
-    if (currentIndex < profiles.length) {
-      handleSwipeLeft();
-    }
-  };
-
-  const handleActionLike = () => {
-    if (currentIndex < profiles.length) {
-      handleSwipeRight();
-    }
-  };
-
-  const currentProfile = profiles[currentIndex];
-  const nextProfile = profiles[currentIndex + 1];
-  const hasMore = currentIndex < profiles.length;
+  const profile = profiles[index];
+  const hasProfile = Boolean(profile);
 
   return (
-    <View style={DiscoverStyles.container}>
-      {/* Header */}
-      <View style={DiscoverStyles.header}>
-        <Text style={DiscoverStyles.headerTitle}>
-          <Text style={DiscoverStyles.headerTitleAccent}>Lyn</Text>k
-        </Text>
-        <TouchableOpacity style={DiscoverStyles.headerIconBtn}>
-          <Sparkle size={22} color="#FF4D6D" weight="fill" />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.kicker}>{currentProfile?.intent === 'dating' ? 'Partner discovery' : 'Friend discovery'}</Text>
+          <Text style={styles.title}>Lynk</Text>
+        </View>
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/profile-setup')}>
+          <SlidersHorizontal size={22} color="#FF4D6D" weight="bold" />
         </TouchableOpacity>
       </View>
 
-      {/* Card Stack Area */}
-      {isLoading ? (
-        <View style={DiscoverStyles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF4D6D" />
-        </View>
-      ) : !hasMore ? (
-        <View style={DiscoverStyles.emptyState}>
-          <Heart size={72} color="#FF4D6D" weight="thin" style={DiscoverStyles.emptyIcon} />
-          <Text style={DiscoverStyles.emptyTitle}>You've seen everyone!</Text>
-          <Text style={DiscoverStyles.emptySubtitle}>
-            Check back later — new people join Lynk every day. 💫
-          </Text>
-        </View>
-      ) : (
-        <View style={DiscoverStyles.cardStack}>
-          {/* Render at most 3 cards in the stack (back to front) */}
-          {[currentIndex + 2, currentIndex + 1, currentIndex].map((idx, stackPos) => {
-            const p = profiles[idx];
-            if (!p) return null;
-            const isTopCard = idx === currentIndex;
-            return (
-              <SwipeCard
-                key={p.id}
-                profile={p}
-                isTop={isTopCard}
-                cardIndex={2 - stackPos}
-                onSwipeLeft={handleSwipeLeft}
-                onSwipeRight={handleSwipeRight}
-              />
-            );
-          })}
+      {!isSupabaseConfigured && (
+        <View style={styles.notice}>
+          <ShieldWarning size={17} color="#7C3AED" weight="bold" />
+          <Text style={styles.noticeText}>Demo data active. Add Supabase env vars to use live tables.</Text>
         </View>
       )}
 
-      {/* Action Buttons */}
-      {hasMore && !isLoading && (
-        <View style={DiscoverStyles.actionsRow}>
-          <TouchableOpacity
-            id="btn-pass"
-            style={DiscoverStyles.actionBtnPass}
-            onPress={handleActionPass}
-            activeOpacity={0.8}
-          >
-            <X size={30} color="#FF4D6D" weight="bold" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            id="btn-superlike"
-            style={DiscoverStyles.actionBtnSuperLike}
-            activeOpacity={0.8}
-          >
-            <Star size={24} color="#5A78FF" weight="fill" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            id="btn-like"
-            style={DiscoverStyles.actionBtnLike}
-            onPress={handleActionLike}
-            activeOpacity={0.8}
-          >
-            <Heart size={30} color="#00C853" weight="fill" />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* 🎉 Match Modal */}
-      <Modal transparent visible={showMatchModal} animationType="fade">
-        <LinearGradient
-          colors={['rgba(250,81,124,0.95)', 'rgba(165,40,205,0.95)']}
-          style={DiscoverStyles.matchOverlay}
-        >
-          <View style={DiscoverStyles.matchCard}>
-            <Text style={DiscoverStyles.matchTitle}>It's a Lynk! 🎉</Text>
-            <Text style={DiscoverStyles.matchSubtitle}>
-              You and {matchedProfile?.firstName} liked each other!
-            </Text>
-
-            {/* Avatar previews */}
-            <View style={DiscoverStyles.matchAvatarsRow}>
-              {currentUser?.photoURL ? (
-                <Image
-                  source={{ uri: currentUser.photoURL }}
-                  style={DiscoverStyles.matchAvatar}
-                />
-              ) : (
-                <LinearGradient
-                  colors={['#FA517C', '#A528CD']}
-                  style={DiscoverStyles.matchAvatar}
-                />
-              )}
-              <Heart size={32} color="#FFFFFF" weight="fill" style={DiscoverStyles.matchHeart} />
-              {matchedProfile?.photoUrls?.[0] ? (
-                <Image
-                  source={{ uri: matchedProfile.photoUrls[0] }}
-                  style={DiscoverStyles.matchAvatar}
-                />
-              ) : (
-                <LinearGradient
-                  colors={['#A528CD', '#FA517C']}
-                  style={DiscoverStyles.matchAvatar}
-                />
-              )}
-            </View>
-
-            <TouchableOpacity
-              style={DiscoverStyles.matchBtn}
-              onPress={() => {
-                setShowMatchModal(false);
-                router.push('/(tabs)/messages');
-              }}
-              activeOpacity={0.85}
-            >
-              <Text style={DiscoverStyles.matchBtnText}>
-                <ChatCircle size={16} color="#FF4D6D" /> Send a Message
-              </Text>
+      <View style={styles.stage}>
+        {loading ? (
+          <ActivityIndicator color="#FF4D6D" size="large" />
+        ) : hasProfile ? (
+          <ProfileCard profile={profile!} onLike={() => swipe('like')} onPass={() => swipe('pass')} />
+        ) : (
+          <View style={styles.empty}>
+            <Heart size={68} color="#FF4D6D" weight="thin" />
+            <Text style={styles.emptyTitle}>No more profiles nearby</Text>
+            <Text style={styles.emptyText}>Try expanding your radius or check back when new students join.</Text>
+            <TouchableOpacity style={styles.reloadButton} onPress={load}>
+              <Text style={styles.reloadText}>Refresh discovery</Text>
             </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
-            <TouchableOpacity
-              style={DiscoverStyles.matchBtnSecondary}
-              onPress={() => setShowMatchModal(false)}
-            >
-              <Text style={DiscoverStyles.matchBtnSecondaryText}>Keep Swiping</Text>
+      {hasProfile && !loading && (
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.passButton} onPress={() => swipe('pass')}><X size={30} color="#FF4D6D" weight="bold" /></TouchableOpacity>
+          <TouchableOpacity style={styles.superButton} onPress={() => swipe('super_like')}><Star size={25} color="#5A67D8" weight="fill" /></TouchableOpacity>
+          <TouchableOpacity style={styles.likeButton} onPress={() => swipe('like')}><Heart size={31} color="#0FA968" weight="fill" /></TouchableOpacity>
+        </View>
+      )}
+
+      <Modal visible={Boolean(match)} transparent animationType="fade">
+        <LinearGradient colors={['rgba(255,77,109,0.96)', 'rgba(124,58,237,0.96)']} style={styles.matchOverlay}>
+          <View style={styles.matchCard}>
+            <Text style={styles.matchTitle}>It is a Lynk</Text>
+            <Text style={styles.matchBody}>You and {match?.displayName} both showed interest. Chat is now unlocked.</Text>
+            <TouchableOpacity style={styles.matchPrimary} onPress={() => { setMatch(null); router.push('/messages'); }}>
+              <ChatCircle size={18} color="#FF4D6D" weight="bold" />
+              <Text style={styles.matchPrimaryText}>Open chat</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.matchSecondary} onPress={() => setMatch(null)}>
+              <Text style={styles.matchSecondaryText}>Keep discovering</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -423,3 +153,44 @@ export default function DiscoverScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#FBF9FF', paddingTop: 54 },
+  header: { paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  kicker: { color: '#766A87', fontWeight: '800', fontSize: 12, textTransform: 'uppercase' },
+  title: { color: '#1A1028', fontSize: 34, fontWeight: '900' },
+  iconButton: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#F0E9F8' },
+  notice: { marginHorizontal: 20, marginTop: 12, padding: 12, borderRadius: 14, backgroundColor: '#F1EBFF', flexDirection: 'row', gap: 8, alignItems: 'center' },
+  noticeText: { color: '#4C357A', fontSize: 12, fontWeight: '700', flex: 1 },
+  stage: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  card: { width: CARD_WIDTH, height: 570, borderRadius: 28, overflow: 'hidden', backgroundColor: '#191027' },
+  photo: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  photoShade: { ...StyleSheet.absoluteFillObject },
+  premiumPill: { position: 'absolute', top: 16, right: 16, paddingHorizontal: 12, height: 32, borderRadius: 16, backgroundColor: 'rgba(124,58,237,0.9)', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  premiumText: { color: '#FFFFFF', fontWeight: '900', fontSize: 12 },
+  cardBody: { position: 'absolute', left: 20, right: 20, bottom: 24 },
+  name: { color: '#FFFFFF', fontSize: 31, fontWeight: '900' },
+  school: { color: '#EFE8F7', fontSize: 13, fontWeight: '700', marginTop: 4 },
+  intentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  intentPill: { color: '#FFFFFF', backgroundColor: 'rgba(255,255,255,0.22)', paddingHorizontal: 11, paddingVertical: 7, borderRadius: 14, overflow: 'hidden', fontWeight: '800', fontSize: 12 },
+  bio: { color: '#FFFFFF', lineHeight: 21, fontSize: 14, marginTop: 12, fontWeight: '600' },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+  tag: { color: '#2B133B', backgroundColor: '#FFFFFF', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 14, overflow: 'hidden', fontWeight: '800', fontSize: 12 },
+  actions: { height: 112, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 20 },
+  passButton: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#FFD3DC' },
+  superButton: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#EEF0FF', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#D9DEFF' },
+  likeButton: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#CFEEDD' },
+  empty: { alignItems: 'center', paddingHorizontal: 28 },
+  emptyTitle: { fontSize: 23, fontWeight: '900', color: '#21182E', marginTop: 14, textAlign: 'center' },
+  emptyText: { fontSize: 14, color: '#766A87', lineHeight: 21, textAlign: 'center', marginTop: 8 },
+  reloadButton: { marginTop: 20, height: 48, borderRadius: 24, backgroundColor: '#FF4D6D', justifyContent: 'center', paddingHorizontal: 20 },
+  reloadText: { color: '#FFFFFF', fontWeight: '900' },
+  matchOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  matchCard: { width: '100%', borderRadius: 28, backgroundColor: '#FFFFFF', padding: 24, alignItems: 'center' },
+  matchTitle: { fontSize: 30, fontWeight: '900', color: '#1A1028' },
+  matchBody: { fontSize: 15, color: '#655B70', textAlign: 'center', lineHeight: 22, marginTop: 10, marginBottom: 20 },
+  matchPrimary: { height: 50, borderRadius: 25, paddingHorizontal: 22, backgroundColor: '#FFF1F4', flexDirection: 'row', alignItems: 'center', gap: 8 },
+  matchPrimaryText: { color: '#FF4D6D', fontWeight: '900' },
+  matchSecondary: { marginTop: 14 },
+  matchSecondaryText: { color: '#655B70', fontWeight: '800' },
+});

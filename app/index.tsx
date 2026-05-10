@@ -5,8 +5,8 @@ import { Heart } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../firebaseConfig';
+import { auth } from '../firebaseConfig';
+import { supabase } from '../utils/supabase';
 
 // We import our newly separated CSS/Styles here
 import { SplashStyles } from '../styles/SplashStyles';
@@ -21,24 +21,29 @@ export default function SplashScreen() {
       await new Promise(resolve => setTimeout(resolve, 2500));
 
       if (user) {
-        // Email unverified → send to verification screen
+        // Email unverified: send to verification screen
         if (user.email && !user.emailVerified) {
           router.replace('/verify-email');
           return;
         }
 
-        // Check if this user has already completed their profile in Firestore
+        // Check if this user has already completed their profile in Supabase
         try {
-          const profileDoc = await getDoc(doc(db, 'users', user.uid));
-          if (profileDoc.exists() && profileDoc.data()?.firstName) {
-            // Profile is complete → go to the main app
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('completed_onboarding')
+            .eq('id', user.uid)
+            .single();
+
+          if (!error && data?.completed_onboarding) {
+            // Profile is complete: go to the main app
             router.replace('/discover');
           } else {
-            // Profile incomplete → go to setup wizard
+            // Profile incomplete: go to setup wizard
             router.replace('/profile-setup');
           }
-        } catch (e) {
-          // Fallback: if Firestore is unreachable, send to profile-setup
+        } catch {
+          // Fallback: if Supabase is unreachable, send to profile-setup
           router.replace('/profile-setup');
         }
       } else {
@@ -49,7 +54,7 @@ export default function SplashScreen() {
 
     // Cleanup listener on unmount
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
   return (
     // LinearGradient gives us that beautiful pink-to-purple background from your design.

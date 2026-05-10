@@ -1,393 +1,217 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator, Image, StyleSheet, ScrollView } from 'react-native';
-import { CaretLeft, Plus, X } from 'phosphor-react-native';
-import * as ImagePicker from 'expo-image-picker';
+import React, { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { CaretLeft, Heart, Users } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { ProfileSetupStyles } from '../styles/ProfileSetupStyles';
-import { saveUserProfileAsync, validateImageSize } from '../utils/firebaseUtils';
+import { saveCurrentProfile } from '../utils/lynkData';
+import { UserIntent } from '../utils/lynkTypes';
+
+const INTERESTS = ['Music', 'Fitness', 'Travel', 'Photography', 'Gaming', 'Cooking', 'Reading', 'Art', 'Sports', 'Movies', 'Nature', 'Tech'];
+const GENDERS = ['Woman', 'Man', 'Non-binary'];
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
-  
-  // Wizard State
   const [step, setStep] = useState(1);
-  const totalSteps = 5;
   const [isLoading, setIsLoading] = useState(false);
+  const [intent, setIntent] = useState<UserIntent>('friends');
+  const [fullName, setFullName] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('Woman');
+  const [bio, setBio] = useState('');
+  const [interests, setInterests] = useState<string[]>(['Tech']);
+  const [preferredGenders, setPreferredGenders] = useState<string[]>(['Woman', 'Man']);
+  const [relationshipGoal, setRelationshipGoal] = useState('relationship');
+  const [radius, setRadius] = useState('25');
 
-  // Form State
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [dob, setDob] = useState(''); 
-  const [gender, setGender] = useState('');
-  const [interestedIn, setInterestedIn] = useState('');
-  // Each entry holds the local URI (for preview) and the base64 string (for upload)
-  const [photos, setPhotos] = useState<{ uri: string; base64: string }[]>([]);
-  const [interests, setInterests] = useState<string[]>([]);
+  const totalSteps = intent === 'dating' ? 5 : 4;
+  const parsedAge = Number(age);
 
-  // Available interest chips
-  const INTERESTS = [
-    '🎵 Music', '🏋️ Fitness', '✈️ Travel', '📸 Photography',
-    '🎮 Gaming', '🍳 Cooking', '📚 Reading', '🎨 Art',
-    '⚽ Sports', '🎬 Movies', '🐾 Pets', '🌿 Nature',
-    '💃 Dancing', '🧘 Yoga', '🎸 Concerts', '🍕 Foodie',
-    '🏄 Surfing', '🧗 Hiking', '🎭 Theatre', '💻 Tech',
-  ];
+  const canContinue = useMemo(() => {
+    if (step === 1) return true;
+    if (step === 2) return fullName.trim().length > 2 && parsedAge >= 16 && gender.length > 0;
+    if (step === 3) return interests.length > 0 && interests.length <= 3;
+    if (step === 4 && intent === 'dating') return parsedAge >= 18 && preferredGenders.length > 0;
+    return true;
+  }, [fullName, gender, interests.length, intent, parsedAge, preferredGenders.length, step]);
 
-  const toggleInterest = (item: string) => {
-    if (interests.includes(item)) {
-      setInterests(interests.filter(i => i !== item));
-    } else if (interests.length < 5) {
-      setInterests([...interests, item]);
+  function toggle(list: string[], value: string, limit: number, setter: (next: string[]) => void) {
+    if (list.includes(value)) {
+      setter(list.filter((item) => item !== value));
+      return;
     }
-  };
+    if (list.length < limit) setter([...list, value]);
+  }
 
-  // Validation
-  const canProceedStep1 = firstName.trim().length > 0 && lastName.trim().length > 0;
-  const canProceedStep2 = dob.length > 0;
-  const canProceedStep3 = gender !== '' && interestedIn !== '';
-  const canProceedStep4 = photos.length > 0 && photos.every(p => p.base64.length > 0);
-  const canProceedStep5 = interests.length >= 1;
-
-  const handleNext = () => {
-    if (step < totalSteps) {
-      setStep(step + 1);
-    } else {
-      submitProfile();
-    }
-  };
-
-  const handleBack = () => {
-    if (step > 1) {
-      setStep(step - 1);
-    }
-  };
-
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 5],
-      quality: 0.1,  // Dropped to 0.1 to ensure base64 stays under Firestore's 1MB limit
-      exif: false,
-      base64: true,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
-
-      if (!asset.base64) {
-        alert('Could not read photo. Please try a different image.');
-        return;
-      }
-
-      // Log size for debugging
-      console.log(`[Picker] Selected image size: ~${Math.round(asset.base64.length / 1024)} KB (base64)`);
-
-      // Validate file size — reject anything over 5MB
-      const sizeError = validateImageSize(asset.fileSize);
-      if (sizeError) {
-        alert(sizeError);
-        return;
-      }
-
-      // Build data URL from the base64 string the picker gave us
-      const ext = asset.uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
-      const dataUrl = `data:${mime};base64,${asset.base64}`;
-
-      setPhotos([...photos, { uri: asset.uri, base64: dataUrl }]);
-    }
-  };
-
-  const removePhoto = (index: number) => {
-    const newPhotos = [...photos];
-    newPhotos.splice(index, 1);
-    setPhotos(newPhotos);
-  };
-
-  const submitProfile = async () => {
+  async function finish() {
     setIsLoading(true);
-    console.log("[Submit] Starting profile submission...");
-    
-    // Create a timeout promise
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Request timed out. Please check your internet or Firebase Firestore setup.")), 15000)
-    );
+    await saveCurrentProfile({
+      fullName: fullName.trim() || 'Demo User',
+      displayName: fullName.trim().split(' ')[0] || 'Demo',
+      age: parsedAge || 21,
+      gender,
+      intent,
+      bio: bio.trim() || 'Student looking for meaningful campus connections.',
+      interests,
+      hobbies: interests,
+      photos: [],
+      university: 'University of Botswana',
+      preferredGenders,
+      preferredMinAge: intent === 'dating' ? 18 : 16,
+      preferredMaxAge: 30,
+      discoveryRadiusKm: Number(radius) || 25,
+      relationshipGoal: intent === 'dating' ? relationshipGoal : undefined,
+      sexualOrientation: intent === 'dating' ? 'Prefer not to say' : undefined,
+    });
+    setIsLoading(false);
+    router.replace('/discover');
+  }
 
-    try {
-      const photoUrls = photos.map(p => p.base64);
-      console.log(`[Submit] Saving profile for ${firstName} with ${photoUrls.length} photos...`);
-
-      // Race the save against the timeout
-      await Promise.race([
-        saveUserProfileAsync({
-          firstName,
-          lastName,
-          dob,
-          gender,
-          interestedIn,
-          interests,
-          photoUrls,
-        }),
-        timeoutPromise
-      ]);
-
-      console.log("[Submit] Profile saved successfully!");
-      alert("Profile created! Welcome to Lynk 🎉");
-      router.replace('/discover');
-      
-    } catch (error: any) {
-      console.error("[Submit] Error:", error);
-      alert("Error: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const renderStepContent = () => {
-    switch (step) {
-      case 1:
-        return (
-          <>
-            <Text style={ProfileSetupStyles.titleText}>What's your name?</Text>
-            <Text style={ProfileSetupStyles.subtitleText}>This is how it will appear on your profile.</Text>
-            
-            <View style={ProfileSetupStyles.inputWrapper}>
-              <TextInput
-                style={ProfileSetupStyles.textInput}
-                placeholder="First Name"
-                placeholderTextColor="#999999"
-                value={firstName}
-                onChangeText={setFirstName}
-              />
-            </View>
-            <View style={ProfileSetupStyles.inputWrapper}>
-              <TextInput
-                style={ProfileSetupStyles.textInput}
-                placeholder="Last Name"
-                placeholderTextColor="#999999"
-                value={lastName}
-                onChangeText={setLastName}
-              />
-            </View>
-          </>
-        );
-      case 2:
-        return (
-          <>
-            <Text style={ProfileSetupStyles.titleText}>When is your birthday?</Text>
-            <Text style={ProfileSetupStyles.subtitleText}>You must be at least 18 years old to use Lynk.</Text>
-            
-            <View style={ProfileSetupStyles.inputWrapper}>
-              <TextInput
-                style={ProfileSetupStyles.textInput}
-                placeholder="DD / MM / YYYY"
-                placeholderTextColor="#999999"
-                keyboardType="numbers-and-punctuation"
-                value={dob}
-                onChangeText={setDob}
-              />
-            </View>
-          </>
-        );
-      case 3:
-        return (
-          <>
-            <Text style={ProfileSetupStyles.titleText}>Who are you?</Text>
-            <Text style={ProfileSetupStyles.subtitleText}>Choose how you identify and who you want to meet.</Text>
-            
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1A1A1A', marginBottom: 10 }}>I am a...</Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <TouchableOpacity 
-                style={[ProfileSetupStyles.optionButton, { width: '48%' }, gender === 'Male' && ProfileSetupStyles.optionButtonActive]}
-                onPress={() => setGender('Male')}
-              >
-                <Text style={[ProfileSetupStyles.optionText, gender === 'Male' && ProfileSetupStyles.optionTextActive]}>Man</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[ProfileSetupStyles.optionButton, { width: '48%' }, gender === 'Female' && ProfileSetupStyles.optionButtonActive]}
-                onPress={() => setGender('Female')}
-              >
-                <Text style={[ProfileSetupStyles.optionText, gender === 'Female' && ProfileSetupStyles.optionTextActive]}>Woman</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#1A1A1A', marginTop: 20, marginBottom: 10 }}>Looking for...</Text>
-            <TouchableOpacity 
-              style={[ProfileSetupStyles.optionButton, interestedIn === 'Women' && ProfileSetupStyles.optionButtonActive]}
-              onPress={() => setInterestedIn('Women')}
-            >
-              <Text style={[ProfileSetupStyles.optionText, interestedIn === 'Women' && ProfileSetupStyles.optionTextActive]}>Women</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[ProfileSetupStyles.optionButton, interestedIn === 'Men' && ProfileSetupStyles.optionButtonActive]}
-              onPress={() => setInterestedIn('Men')}
-            >
-              <Text style={[ProfileSetupStyles.optionText, interestedIn === 'Men' && ProfileSetupStyles.optionTextActive]}>Men</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[ProfileSetupStyles.optionButton, interestedIn === 'Everyone' && ProfileSetupStyles.optionButtonActive]}
-              onPress={() => setInterestedIn('Everyone')}
-            >
-              <Text style={[ProfileSetupStyles.optionText, interestedIn === 'Everyone' && ProfileSetupStyles.optionTextActive]}>Everyone</Text>
-            </TouchableOpacity>
-          </>
-        );
-      case 4:
-        return (
-          <>
-            <Text style={ProfileSetupStyles.titleText}>Add your photos</Text>
-            <Text style={ProfileSetupStyles.subtitleText}>Add at least 1 photo to continue. The more, the better!</Text>
-            
-            <View style={ProfileSetupStyles.photoGrid}>
-              {[0, 1, 2, 3].map((index) => {
-                const hasPhoto = index < photos.length;
-                return (
-                  <View key={index} style={ProfileSetupStyles.photoBox}>
-                    {hasPhoto ? (
-                      <>
-                        <Image source={{ uri: photos[index].uri }} style={ProfileSetupStyles.photoImage} />
-                        <TouchableOpacity style={ProfileSetupStyles.deletePhotoIcon} onPress={() => removePhoto(index)}>
-                          <X color="#FFFFFF" size={16} weight="bold" />
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      index === photos.length && (
-                        <TouchableOpacity style={ProfileSetupStyles.addPhotoIcon} onPress={pickImage}>
-                          <Plus color="#FFFFFF" size={20} weight="bold" />
-                        </TouchableOpacity>
-                      )
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          </>
-        );
-      case 5:
-        return (
-          <>
-            <Text style={ProfileSetupStyles.titleText}>Your interests</Text>
-            <Text style={ProfileSetupStyles.subtitleText}>
-              Pick up to 5 things you love. This helps us find your perfect Lynk! ✨
-            </Text>
-
-            <View style={interestStyles.grid}>
-              {INTERESTS.map((item) => {
-                const selected = interests.includes(item);
-                return (
-                  <TouchableOpacity
-                    key={item}
-                    style={[interestStyles.chip, selected && interestStyles.chipActive]}
-                    onPress={() => toggleInterest(item)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={[interestStyles.chipText, selected && interestStyles.chipTextActive]}>
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={interestStyles.counter}>
-              {interests.length}/5 selected
-            </Text>
-          </>
-        );
-      default:
-        return null;
-    }
-  };
-
-  let canProceed = false;
-  if (step === 1) canProceed = canProceedStep1;
-  else if (step === 2) canProceed = canProceedStep2;
-  else if (step === 3) canProceed = canProceedStep3;
-  else if (step === 4) canProceed = canProceedStep4;
-  else if (step === 5) canProceed = canProceedStep5;
+  function next() {
+    if (step < totalSteps) setStep(step + 1);
+    else finish();
+  }
 
   return (
-    <KeyboardAvoidingView 
-      style={ProfileSetupStyles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <KeyboardAvoidingView style={ProfileSetupStyles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={ProfileSetupStyles.progressContainer}>
         <View style={ProfileSetupStyles.progressBarBackground}>
           <View style={[ProfileSetupStyles.progressBarFill, { width: `${(step / totalSteps) * 100}%` }]} />
         </View>
       </View>
 
-      <ScrollView
-        style={ProfileSetupStyles.contentContainer}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {renderStepContent()}
+      <ScrollView style={ProfileSetupStyles.contentContainer} contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+        {step === 1 && (
+          <>
+            <Text style={ProfileSetupStyles.titleText}>What brings you to Lynk?</Text>
+            <Text style={ProfileSetupStyles.subtitleText}>Your intent shapes profile depth, filters, and match suggestions.</Text>
+            <TouchableOpacity
+              style={[ProfileSetupStyles.intentCard, intent === 'friends' && ProfileSetupStyles.intentCardActive]}
+              onPress={() => setIntent('friends')}
+            >
+              <Users size={24} color={intent === 'friends' ? '#FFFFFF' : '#FF4D6D'} weight="bold" />
+              <View style={{ flex: 1 }}>
+                <Text style={[ProfileSetupStyles.intentTitle, intent === 'friends' && ProfileSetupStyles.intentTitleActive]}>Find friends</Text>
+                <Text style={[ProfileSetupStyles.intentBody, intent === 'friends' && ProfileSetupStyles.intentBodyActive]}>Study partners, club buddies, and casual social connections.</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[ProfileSetupStyles.intentCard, intent === 'dating' && ProfileSetupStyles.intentCardActive]}
+              onPress={() => setIntent('dating')}
+            >
+              <Heart size={24} color={intent === 'dating' ? '#FFFFFF' : '#FF4D6D'} weight="fill" />
+              <View style={{ flex: 1 }}>
+                <Text style={[ProfileSetupStyles.intentTitle, intent === 'dating' && ProfileSetupStyles.intentTitleActive]}>Find a partner</Text>
+                <Text style={[ProfileSetupStyles.intentBody, intent === 'dating' && ProfileSetupStyles.intentBodyActive]}>Romantic matching with age, orientation, and relationship-goal filters.</Text>
+              </View>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <Text style={ProfileSetupStyles.titleText}>Build your profile</Text>
+            <Text style={ProfileSetupStyles.subtitleText}>Dating profiles require users to be 18 or older.</Text>
+            <View style={ProfileSetupStyles.inputWrapper}>
+              <TextInput style={ProfileSetupStyles.textInput} placeholder="Full name" placeholderTextColor="#999999" value={fullName} onChangeText={setFullName} />
+            </View>
+            <View style={ProfileSetupStyles.inputWrapper}>
+              <TextInput style={ProfileSetupStyles.textInput} placeholder="Age" placeholderTextColor="#999999" keyboardType="number-pad" value={age} onChangeText={setAge} />
+            </View>
+            <View style={ProfileSetupStyles.chipRow}>
+              {GENDERS.map((item) => (
+                <TouchableOpacity key={item} style={[ProfileSetupStyles.chip, gender === item && ProfileSetupStyles.chipActive]} onPress={() => setGender(item)}>
+                  <Text style={[ProfileSetupStyles.chipText, gender === item && ProfileSetupStyles.chipTextActive]}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={[ProfileSetupStyles.inputWrapper, { minHeight: 104, alignItems: 'flex-start', paddingTop: 12 }]}>
+              <TextInput
+                style={[ProfileSetupStyles.textInput, { minHeight: 78 }]}
+                placeholder="Short bio"
+                placeholderTextColor="#999999"
+                value={bio}
+                onChangeText={setBio}
+                multiline
+              />
+            </View>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <Text style={ProfileSetupStyles.titleText}>Choose up to three interests</Text>
+            <Text style={ProfileSetupStyles.subtitleText}>These power matching, club suggestions, and ice breakers.</Text>
+            <View style={ProfileSetupStyles.chipRow}>
+              {INTERESTS.map((item) => {
+                const selected = interests.includes(item);
+                return (
+                  <TouchableOpacity key={item} style={[ProfileSetupStyles.chip, selected && ProfileSetupStyles.chipActive]} onPress={() => toggle(interests, item, 3, setInterests)}>
+                    <Text style={[ProfileSetupStyles.chipText, selected && ProfileSetupStyles.chipTextActive]}>{item}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={ProfileSetupStyles.counterText}>{interests.length}/3 selected</Text>
+          </>
+        )}
+
+        {step === 4 && intent === 'dating' && (
+          <>
+            <Text style={ProfileSetupStyles.titleText}>Dating preferences</Text>
+            <Text style={ProfileSetupStyles.subtitleText}>These filters keep romantic discovery age-appropriate and relevant.</Text>
+            <View style={ProfileSetupStyles.chipRow}>
+              {GENDERS.map((item) => {
+                const selected = preferredGenders.includes(item);
+                return (
+                  <TouchableOpacity key={item} style={[ProfileSetupStyles.chip, selected && ProfileSetupStyles.chipActive]} onPress={() => toggle(preferredGenders, item, 3, setPreferredGenders)}>
+                    <Text style={[ProfileSetupStyles.chipText, selected && ProfileSetupStyles.chipTextActive]}>{item}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={ProfileSetupStyles.inputWrapper}>
+              <TextInput style={ProfileSetupStyles.textInput} placeholder="relationship, casual, unsure" placeholderTextColor="#999999" value={relationshipGoal} onChangeText={setRelationshipGoal} />
+            </View>
+          </>
+        )}
+
+        {((step === 4 && intent === 'friends') || step === 5) && (
+          <>
+            <Text style={ProfileSetupStyles.titleText}>Discovery range</Text>
+            <Text style={ProfileSetupStyles.subtitleText}>Lynk rounds precise location for privacy and focuses on nearby campus connections.</Text>
+            <View style={ProfileSetupStyles.inputWrapper}>
+              <TextInput style={ProfileSetupStyles.textInput} placeholder="Distance radius in km" placeholderTextColor="#999999" keyboardType="number-pad" value={radius} onChangeText={setRadius} />
+            </View>
+            <View style={ProfileSetupStyles.summaryBox}>
+              <Text style={ProfileSetupStyles.summaryTitle}>{intent === 'friends' ? 'Friendship profile' : 'Dating profile'}</Text>
+              <Text style={ProfileSetupStyles.summaryText}>Interests: {interests.join(', ')}</Text>
+              <Text style={ProfileSetupStyles.summaryText}>Radius: {radius || 25} km</Text>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       <View style={ProfileSetupStyles.footerContainer}>
         {step > 1 ? (
-          <TouchableOpacity style={ProfileSetupStyles.navButton} onPress={handleBack}>
+          <TouchableOpacity style={ProfileSetupStyles.navButton} onPress={() => setStep(step - 1)}>
             <CaretLeft color="#1A1A1A" size={24} weight="bold" />
           </TouchableOpacity>
         ) : (
-          <View style={ProfileSetupStyles.navButton} /> 
+          <View style={ProfileSetupStyles.navButton} />
         )}
-
-        <TouchableOpacity 
-          style={[ProfileSetupStyles.primaryButton, !canProceed && ProfileSetupStyles.primaryButtonDisabled]}
-          onPress={handleNext}
-          disabled={!canProceed || isLoading}
-          activeOpacity={0.8}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={ProfileSetupStyles.primaryButtonText}>
-              {step === totalSteps ? 'Finish 🎉' : 'Next'}
-            </Text>
-          )}
+        <TouchableOpacity style={[ProfileSetupStyles.primaryButton, !canContinue && ProfileSetupStyles.primaryButtonDisabled]} onPress={next} disabled={!canContinue || isLoading}>
+          {isLoading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={ProfileSetupStyles.primaryButtonText}>{step === totalSteps ? 'Finish' : 'Next'}</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
-
-// ─── Interests chip grid styles ───────────────────────────────────────────────
-const interestStyles = StyleSheet.create({
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 12,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-  },
-  chipActive: {
-    borderColor: '#FF4D6D',
-    backgroundColor: '#FFF0F3',
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#888888',
-  },
-  chipTextActive: {
-    color: '#FF4D6D',
-  },
-  counter: {
-    marginTop: 16,
-    fontSize: 13,
-    color: '#BBBBBB',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-});

@@ -1,0 +1,155 @@
+import { LynkClub, LynkMatch, LynkMessage, LynkProfile } from './lynkTypes';
+
+export const DEMO_USER_ID = 'demo-user';
+
+export const demoProfiles: LynkProfile[] = [
+  {
+    id: 'profile-ama',
+    fullName: 'Ama Kgosidintsi',
+    displayName: 'Ama',
+    age: 21,
+    gender: 'Woman',
+    intent: 'friends',
+    bio: 'Computer science student looking for study partners, coffee walks, and campus events.',
+    interests: ['Tech', 'Photography', 'Fitness'],
+    hobbies: ['Hackathons', 'Pilates', 'Cafe hopping'],
+    photos: ['https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=900&auto=format&fit=crop&q=80'],
+    university: 'University of Botswana',
+    distanceKm: 1.4,
+    isPremium: true,
+  },
+  {
+    id: 'profile-kabo',
+    fullName: 'Kabo Motsumi',
+    displayName: 'Kabo',
+    age: 23,
+    gender: 'Man',
+    intent: 'dating',
+    bio: 'Final year architecture student. Into galleries, trail runs, and quiet dinner spots.',
+    interests: ['Art', 'Hiking', 'Food'],
+    hobbies: ['Sketching', 'Trail running', 'Live music'],
+    photos: ['https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=900&auto=format&fit=crop&q=80'],
+    university: 'Botswana Accountancy College',
+    distanceKm: 3.2,
+    relationshipGoal: 'Relationship',
+  },
+  {
+    id: 'profile-neo',
+    fullName: 'Neo Ramotswa',
+    displayName: 'Neo',
+    age: 20,
+    gender: 'Woman',
+    intent: 'friends',
+    bio: 'Basketball fan, debate club member, and always available for a library accountability session.',
+    interests: ['Sports', 'Debate', 'Reading'],
+    hobbies: ['Basketball', 'Podcasts', 'Volunteering'],
+    photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=900&auto=format&fit=crop&q=80'],
+    university: 'University of Botswana',
+    distanceKm: 0.8,
+  },
+  {
+    id: 'profile-thato',
+    fullName: 'Thato Moremi',
+    displayName: 'Thato',
+    age: 24,
+    gender: 'Man',
+    intent: 'dating',
+    bio: 'Media student, weekend DJ, and looking for something intentional but low-pressure.',
+    interests: ['Music', 'Movies', 'Travel'],
+    hobbies: ['DJ sets', 'Film nights', 'Road trips'],
+    photos: ['https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=900&auto=format&fit=crop&q=80'],
+    university: 'Limkokwing University',
+    distanceKm: 4.5,
+    relationshipGoal: 'Unsure',
+    isPremium: true,
+  },
+];
+
+export const demoMatches: LynkMatch[] = [
+  {
+    id: 'match-ama',
+    profile: demoProfiles[0],
+    createdAt: new Date(Date.now() - 1000 * 60 * 32).toISOString(),
+    lastMessage: 'Library at 6 still works for me.',
+    unreadCount: 1,
+  },
+  {
+    id: 'match-kabo',
+    profile: demoProfiles[1],
+    createdAt: new Date(Date.now() - 1000 * 60 * 90).toISOString(),
+    lastMessage: 'That gallery opening sounds good.',
+    unreadCount: 0,
+  },
+];
+
+export const demoMessages: LynkMessage[] = [
+  {
+    id: 'msg-1',
+    matchId: 'match-ama',
+    senderId: 'profile-ama',
+    body: 'Your Tech Society RSVP popped up. Are you going?',
+    createdAt: new Date(Date.now() - 1000 * 60 * 34).toISOString(),
+    type: 'text',
+  },
+  {
+    id: 'msg-2',
+    matchId: 'match-ama',
+    senderId: DEMO_USER_ID,
+    body: 'Yes. I want to meet people before the hackathon.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 33).toISOString(),
+    type: 'text',
+  },
+  {
+    id: 'msg-3',
+    matchId: 'match-ama',
+    senderId: 'profile-ama',
+    body: 'Library at 6 still works for me.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 32).toISOString(),
+    type: 'text',
+  },
+];
+
+export const demoClubs: LynkClub[] = [
+  {
+    id: 'club-tech',
+    name: 'Tech Society',
+    category: 'Technology',
+    description: 'Weekly build nights, startup talks, and hackathon teams for students across campus.',
+    meetingDay: 'Wednesdays',
+    memberCount: 128,
+    nextEvent: {
+      id: 'event-hack',
+      title: 'Campus Hack Night',
+      startsAt: 'Fri 18:00',
+      location: 'Innovation Lab',
+    },
+  },
+  {
+    id: 'club-outdoor',
+    name: 'Outdoor Collective',
+    category: 'Wellness',
+    description: 'Low-pressure hiking, cycling, and weekend activities for students who want to get outside.',
+    meetingDay: 'Saturdays',
+    memberCount: 84,
+    nextEvent: {
+      id: 'event-hike',
+      title: 'Kgale Hill Sunrise Hike',
+      startsAt: 'Sat 05:30',
+      location: 'Kgale Hill',
+    },
+  },
+  {
+    id: 'club-arts',
+    name: 'Arts and Film Club',
+    category: 'Creative',
+    description: 'Film screenings, gallery trips, photo walks, and student showcase nights.',
+    meetingDay: 'Thursdays',
+    memberCount: 96,
+    nextEvent: {
+      id: 'event-film',
+      title: 'Short Film Mixer',
+      startsAt: 'Thu 19:00',
+      location: 'Student Centre',
+    },
+  },
+];
